@@ -132,50 +132,10 @@ function handleJoinRoom(room) {
   if (typeof room === "string") room = JSON.parse(room);
   pendingRoom = PUBLIC_ROOMS.find(r => r.id === room.id) || room;
 
-  if (pendingRoom.password) {
-    openPasswordModal(pendingRoom);
-  } else {
-    loadRoom(pendingRoom);
-  }
-}
-
-// ── PASSWORD MODAL ───────────────────────────────────────────
-
-function openPasswordModal(room) {
-  pendingRoom = room;
-  document.getElementById("passwordInput").value = "";
-  document.getElementById("modalError").textContent = "";
-  document.getElementById("modal-password").classList.add("open");
-  setTimeout(() => document.getElementById("passwordInput").focus(), 300);
-}
-
-function closePasswordModal() {
-  document.getElementById("modal-password").classList.remove("open");
-}
-
-function handleModalBackdrop(e) {
-  if (e.target === document.getElementById("modal-password")) closePasswordModal();
-}
-
-function submitPassword() {
-  const input = document.getElementById("passwordInput").value.trim();
-  if (!input) {
-    document.getElementById("modalError").textContent = "Please enter the arena password.";
-    return;
-  }
-  if (input !== pendingRoom.password) {
-    document.getElementById("modalError").textContent = "Incorrect password. Access denied.";
-    document.getElementById("passwordInput").classList.add("shake");
-    setTimeout(() => document.getElementById("passwordInput").classList.remove("shake"), 500);
-    return;
-  }
-  closePasswordModal();
   loadRoom(pendingRoom);
 }
 
-function clearPasswordError() {
-  document.getElementById("modalError").textContent = "";
-}
+
 
 // ── LOADING SCREEN ───────────────────────────────────────────
 
@@ -249,13 +209,7 @@ function renderLobby(room) {
 
   // Details grid
   const details = document.getElementById("lobbyDetails");
-  const pwDisplay = room.password
-    ? `<span id="pwText">••••••••</span>
-       <button class="pw-copy-btn" onclick="togglePwReveal('${room.password}')" title="Reveal">
-         <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2.5" stroke="currentColor" stroke-width="1.2"/><path d="M1 7s2.5-4 6-4 6 4 6 4-2.5 4-6 4-6-4-6-4z" stroke="currentColor" stroke-width="1.2"/></svg>
-       </button>
-       <span class="pw-copied" id="pwCopied" style="display:none">Revealed!</span>`
-    : `<span style="color:var(--gold-light)">Open Access</span>`;
+  const pwDisplay = `<span style="color:var(--gold-light)">Open Access</span>`;
 
   details.innerHTML = `
     <div class="detail-cell">
@@ -306,19 +260,7 @@ function renderLobby(room) {
   showScreen("screen-lobby");
 }
 
-// Reveal/hide password
-function togglePwReveal(pw) {
-  const el  = document.getElementById("pwText");
-  const msg = document.getElementById("pwCopied");
-  if (el.textContent === "••••••••") {
-    el.textContent = pw;
-    msg.style.display = "inline";
-    setTimeout(() => { el.textContent = "••••••••"; msg.style.display = "none"; }, 3000);
-  } else {
-    el.textContent = "••••••••";
-    msg.style.display = "none";
-  }
-}
+
 
 // ── START RACE FROM LOBBY ────────────────────────────────────
 
@@ -1472,7 +1414,6 @@ async function shareInviteLink() {
 
 function handleCreateRoom() {
   const name = document.getElementById("create-room-name").value.trim() || "Elite Arena";
-  const pass = document.getElementById("create-room-pass").value.trim();
   const code = document.getElementById("invite-code-val").value;
 
   const newRoom = {
@@ -1480,15 +1421,15 @@ function handleCreateRoom() {
     name: name,
     host: "You", // In a real app, this would be the logged-in user
     icon: selectedIconVal,
-    type: pass ? "private" : "open",
+    type: "open",
     tag: "fast",
-    tagLabel: pass ? "★ PRIVATE" : "⚡ FAST PLAY",
+    tagLabel: "⚡ FAST PLAY",
     stake: selectedStakeVal,
     players: ["You"],
     maxPlayers: 6,
     track: "Thunder Downs",
     distance: "1200m",
-    password: pass || null,
+    password: null,
     inviteCode: code
   };
 

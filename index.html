@@ -76,7 +76,7 @@
     <div class="create-form">
       <input type="text" id="create-room-name" placeholder="Enter Room Name" class="create-input">
       
-      <input type="password" id="create-room-pass" placeholder="Enter Room Password (Optional)" class="create-input">
+
       
       <div class="dropdown-group" onclick="toggleDropdown('stake-options')">
         <label>Edit Stake</label>
@@ -203,23 +203,7 @@
     </div>
   </div>
 </div>
-     PASSWORD MODAL (overlay)
-══════════════════════════════════════════ -->
-<div id="modal-password" class="modal-overlay" onclick="handleModalBackdrop(event)">
-  <div class="modal-box" id="modalBox">
-    <div class="modal-lock-icon">
-      <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="6" y="14" width="20" height="14" rx="3" stroke="#c9a227" stroke-width="2"/><path d="M10 14V10a6 6 0 0112 0v4" stroke="#c9a227" stroke-width="2" stroke-linecap="round"/><circle cx="16" cy="21" r="2" fill="#c9a227"/></svg>
-    </div>
-    <div class="modal-title">PRIVATE ARENA</div>
-    <p class="modal-body">This race track is restricted. Enter the access code to enter the gates.</p>
-    <input type="password" id="passwordInput" class="modal-input" placeholder="Enter arena password…" onkeydown="if(event.key==='Enter')submitPassword()"/>
-    <div class="modal-error" id="modalError"></div>
-    <div class="modal-btns">
-      <button class="btn-ghost" onclick="closePasswordModal()">Cancel</button>
-      <button class="btn-primary small" onclick="submitPassword()">ENTER ARENA</button>
-    </div>
-  </div>
-</div>
+
 
 <!-- ══════════════════════════════════════════
      LEAVE CONFIRMATION MODAL (overlay)
