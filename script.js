@@ -3,6 +3,11 @@
 //  Depends on: backend.js (must load first)
 // ═══════════════════════════════════════════════════════════
 
+// Initialize 3D Background
+document.addEventListener('DOMContentLoaded', () => {
+  initDottedSurface();
+});
+
 // ── NAVIGATION ───────────────────────────────────────────────
 
 function showScreen(id) {
@@ -1552,5 +1557,87 @@ function submitJoinCode() {
     setTimeout(() => document.getElementById("joinCodeInput").classList.remove("shake"), 500);
   }
 }
+
+// ── DOTTED SURFACE 3D BACKGROUND ─────────────────────────────
+
+function initDottedSurface() {
+  const container = document.getElementById('dotted-surface-container');
+  if (!container || !window.THREE) return;
+
+  const SEPARATION = 150;
+  const AMOUNTX = 40;
+  const AMOUNTY = 60;
+
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0e1016, 1000, 8000);
+
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 10000);
+  camera.position.set(0, 450, 1000);
+
+  const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  const positions = [];
+  const colors = [];
+  const geometry = new THREE.BufferGeometry();
+
+  for (let ix = 0; ix < AMOUNTX; ix++) {
+    for (let iy = 0; iy < AMOUNTY; iy++) {
+      const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
+      const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
+      positions.push(x, 0, z);
+      // Premium gold-ish dots
+      colors.push(201/255, 162/255, 39/255); 
+    }
+  }
+
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+
+  const material = new THREE.PointsMaterial({
+    size: 10,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.7,
+    sizeAttenuation: true
+  });
+
+  const points = new THREE.Points(geometry, material);
+  scene.add(points);
+
+  let count = 0;
+
+  function animate() {
+    requestAnimationFrame(animate);
+    
+    const positionAttribute = geometry.attributes.position;
+    const positions = positionAttribute.array;
+
+    let i = 0;
+    for (let ix = 0; ix < AMOUNTX; ix++) {
+      for (let iy = 0; iy < AMOUNTY; iy++) {
+        const index = i * 3;
+        // Wave animation - increased amplitude
+        positions[index + 1] = Math.sin((ix + count) * 0.3) * 100 + Math.sin((iy + count) * 0.5) * 100;
+        i++;
+      }
+    }
+
+    positionAttribute.needsUpdate = true;
+    renderer.render(scene, camera);
+    count += 0.05;
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  animate();
+}
+
 
 

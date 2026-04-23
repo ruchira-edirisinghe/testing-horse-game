@@ -9,6 +9,7 @@
   --bg:           #0e1016;
   --bg-2:         #141720;
   --bg-3:         #1b1f2e;
+  --bg-premium:   radial-gradient(circle at 50% -10%, #2a2a35 0%, #16161d 50%, #0e1016 100%);
   --bg-card:      #181c28;
   --bg-card-2:    #1f2435;
   --gold:         #c9a227;
@@ -42,13 +43,24 @@
   --section-gap:  14px;
 }
 
+#dotted-surface-container {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: var(--bg-premium);
+}
+
 /* ── RESET ──────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: 100%; min-height: 100vh; }
 
 body {
   font-family: var(--font-body);
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-premium);
+  background-attachment: fixed;
+  background-size: cover;
   color: var(--text-primary);
   display: flex;
   justify-content: center;
@@ -64,6 +76,7 @@ body {
   flex-direction: column;
   position: relative;
   overflow: hidden;
+  background: transparent;
 }
 .screen.active { display: flex; }
 
@@ -175,7 +188,7 @@ body {
 /* ══════════════════════════════════════════
    SCREEN 1 — HOME
 ══════════════════════════════════════════ */
-#screen-home { background: var(--bg); }
+#screen-home { background: transparent; }
 
 .home-hero {
   flex: 1;
@@ -348,7 +361,7 @@ body {
    SCREEN 3 — LIVE ARENAS
 ══════════════════════════════════════════ */
 #screen-rooms {
-  background: var(--bg);
+  background: transparent;
   display: none;
   flex-direction: column;
 }
@@ -630,7 +643,7 @@ body {
    SCREEN 4 — LOADING
 ══════════════════════════════════════════ */
 #screen-loading {
-  background: var(--bg);
+  background: transparent;
   align-items: center;
   justify-content: center;
 }
@@ -739,7 +752,7 @@ body {
 /* ══════════════════════════════════════════
    SCREEN 5 — LOBBY
 ══════════════════════════════════════════ */
-#screen-lobby { background: var(--bg); display: none; flex-direction: column; }
+#screen-lobby { background: transparent; display: none; flex-direction: column; }
 
 .lobby-banner {
   background: var(--bg-2);
