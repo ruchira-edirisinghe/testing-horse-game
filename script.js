@@ -5,6 +5,7 @@
 
 // ── MULTIPLAYER INITIALIZATION ──────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initFirebase();   // Connect to Firebase Realtime Database
   initDottedSurface();
   // Show player name modal on first load
   setTimeout(() => {
@@ -56,25 +57,30 @@ function changePlayerName() {
 }
 
 // ── MULTIPLAYER ROOM TRACKING ──────────────────────────────
-let multiplayerRooms = [];  // Active multiplayer rooms
+let multiplayerRooms = [];  // local cache (used for rooms list display)
 let createdRoomCode = null;
 let createdRoomData = null;
 
-// Store created room locally (in real app, would use Firebase)
+// Store room locally AND in Firebase
 function storeMultiplayerRoom(roomData) {
   multiplayerRooms.push(roomData);
-  // In production, push to Firebase: db.ref('rooms/' + roomCode).set(roomData)
-  return roomData.code;
+  return saveRoomToFirebase(roomData);  // returns Promise<code>
 }
 
-// Find room by code
+// Find room by code — checks local cache first, then Firebase
 function findRoomByCode(code) {
-  return multiplayerRooms.find(r => r.code.toUpperCase() === code.toUpperCase());
+  return multiplayerRooms.find(r => r.code.toUpperCase() === code.toUpperCase()) || null;
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────
 
 function showScreen(id) {
+  // Detach Firebase lobby listener when navigating away from lobby
+  if (id !== "screen-lobby" && typeof _lobbyUnsubscribe === "function") {
+    _lobbyUnsubscribe();
+    _lobbyUnsubscribe = null;
+  }
+
   // Hide all
   document.querySelectorAll(".screen").forEach(s => {
     s.style.display = "none";
@@ -87,7 +93,7 @@ function showScreen(id) {
 
   // Handle screen-specific initializations
   if (id === "screen-create") {
-    generatedInviteCode = null; // reset so a fresh code is always generated
+    generatedInviteCode = null;   // always get a fresh code
     generateInviteCode();
   }
   
@@ -273,32 +279,19 @@ function loadRoom(room) {
 
 // ── LOBBY ────────────────────────────────────────────────────
 
-function renderLobby(room) {
-  // Update room with current player if joining
-  if (room.code && !room.playerList.find(p => p.id === playerId)) {
-    room.playerList.push({
-      id: playerId,
-      name: playerName,
-      ready: false,
-      joinedAt: Date.now()
-    });
-    room.players.push(playerName);
-  }
-
-  // Banner
-  const banner = document.getElementById("lobbyBanner");
-  const isPrivate = room.type === "private";
-  const isRanked  = room.tag === "ranked";
+// Pure render — paints whatever room object it receives
+function _paintLobby(room) {
+  activeRoom = room;
+  const isPrivate     = room.type === "private";
+  const isRanked      = room.tag  === "ranked";
   const isMultiplayer = !!room.code;
-  
+
   const lockIcon = `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="10" width="14" height="9" rx="2" stroke="#6b7399" stroke-width="1.5"/><path d="M7 10V8a4 4 0 018 0v2" stroke="#6b7399" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   const gameIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="3.5" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5"/><path d="M8 12h3M9.5 10.5v3" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5" stroke-linecap="round"/><circle cx="16" cy="12" r="1.5" fill="${isRanked ? '#c9a227' : '#e8be45'}"/></svg>`;
-
-  const tagBadge = `<span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>`;
-
+  const tagBadge    = `<span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>`;
   const codeDisplay = isMultiplayer ? `<div class="lobby-room-code"><strong>CODE:</strong> ${room.code}</div>` : '';
 
-  banner.innerHTML = `
+  document.getElementById("lobbyBanner").innerHTML = `
     <div class="lobby-room-icon-wrap">${isPrivate ? lockIcon : gameIcon}</div>
     <div style="flex:1;min-width:0">
       <div class="lobby-room-title">${room.name}</div>
@@ -313,11 +306,7 @@ function renderLobby(room) {
       </button>
     </div>`;
 
-  // Details grid
-  const details = document.getElementById("lobbyDetails");
-  const pwDisplay = `<span style="color:var(--gold-light)">Open Access</span>`;
-
-  details.innerHTML = `
+  document.getElementById("lobbyDetails").innerHTML = `
     <div class="detail-cell">
       <div class="detail-label">Track</div>
       <div class="detail-value">${room.track}</div>
@@ -332,46 +321,80 @@ function renderLobby(room) {
     </div>
     <div class="detail-cell">
       <div class="detail-label">Capacity</div>
-      <div class="detail-value">${room.players.length} / ${room.maxPlayers}</div>
+      <div class="detail-value">${(room.players||[]).length} / ${room.maxPlayers}</div>
     </div>
     <div class="detail-cell" style="grid-column:1/-1">
       <div class="detail-label">Password</div>
-      <div class="detail-value password-cell" style="display:flex;align-items:center;gap:8px;font-size:14px">${pwDisplay}</div>
+      <div class="detail-value password-cell" style="display:flex;align-items:center;gap:8px;font-size:14px">
+        <span style="color:var(--gold-light)">Open Access</span>
+      </div>
     </div>`;
 
-  // Players - use playerList if available
   const playersDiv = document.getElementById("lobbyPlayers");
   playersDiv.innerHTML = "";
-  document.getElementById("lobbyPlayerCount").textContent = room.players.length + "/" + room.maxPlayers;
+  document.getElementById("lobbyPlayerCount").textContent =
+    (room.players||[]).length + "/" + room.maxPlayers;
 
-  const playerList = room.playerList || room.players.map((name, i) => ({
-    name,
-    id: "player_" + i,
-    ready: i % 2 === 0,
-    joinedAt: Date.now()
+  const playerList = room.playerList || (room.players||[]).map((name, i) => ({
+    name, id: "player_" + i, ready: false, joinedAt: Date.now()
   }));
 
   playerList.forEach((player, i) => {
-    const isHost  = player.name === room.host;
-    const isCurrentPlayer = player.id === playerId;
-    const isReady = player.ready || (i % 2 === 0);
+    const isHost          = player.name === room.host;
+    const isCurrentPlayer = player.id   === playerId;
     const initials = (player.name || 'PL').slice(0, 2).toUpperCase();
     const row = document.createElement("div");
     row.className = "player-row";
     row.style.animationDelay = (i * 80) + "ms";
     row.innerHTML = `
       <div class="player-avatar ${isHost ? 'host-avatar' : ''} ${isCurrentPlayer ? 'current-player' : ''}">${initials}</div>
-      <div class="player-name">${player.name}${isCurrentPlayer ? ' (You)' : ''}</div>
-      ${isHost  ? '<span class="player-host-badge">HOST</span>' : ''}
-      ${isReady ? '<span class="player-ready-badge">READY</span>' : ''}`;
+      <div class="player-name">${player.name}${isCurrentPlayer ? ' <span style="opacity:.6">(You)</span>' : ''}</div>
+      ${isHost ? '<span class="player-host-badge">HOST</span>' : ''}
+      <span class="player-ready-badge">READY</span>`;
     playersDiv.appendChild(row);
   });
 
-  // Stake note
   document.getElementById("lobbyStakeNote").innerHTML =
     `Entry stake: <span>${room.stake} credits</span> will be deducted on race start`;
+}
 
-  showScreen("screen-lobby");
+function renderLobby(room) {
+  // If this is a multiplayer room, add this player to Firebase first,
+  // then subscribe to live updates so the lobby reflects everyone's presence.
+  if (room.code) {
+    const myPlayerObj = { id: playerId, name: playerName, ready: false, joinedAt: Date.now() };
+    const isAlreadyIn = (room.playerList || []).find(p => p.id === playerId);
+
+    const enterAndListen = (latestRoom) => {
+      _paintLobby(latestRoom);
+
+      // Only switch screen once
+      const lobbyEl = document.getElementById("screen-lobby");
+      if (!lobbyEl.classList.contains("active")) {
+        showScreen("screen-lobby");
+      }
+
+      // Subscribe to live changes (new players joining, etc.)
+      if (typeof _lobbyUnsubscribe === "function") _lobbyUnsubscribe();
+      _lobbyUnsubscribe = listenToRoom(latestRoom.code, updatedRoom => {
+        _paintLobby(updatedRoom);
+      });
+    };
+
+    if (isAlreadyIn) {
+      // Host — already in the room, just subscribe
+      enterAndListen(room);
+    } else {
+      // Joiner — write to Firebase then subscribe
+      addPlayerToFirebaseRoom(room.code, myPlayerObj)
+        .then(updatedRoom => enterAndListen(updatedRoom || room))
+        .catch(() => enterAndListen(room));  // fallback on error
+    }
+  } else {
+    // Public room (no Firebase)
+    _paintLobby(room);
+    showScreen("screen-lobby");
+  }
 }
 
 // ── START RACE FROM LOBBY ────────────────────────────────────
@@ -420,14 +443,8 @@ function selectIcon(icon, event) {
 }
 
 function generateInviteCode() {
-  // Always generate a fresh code when entering the create room screen
-  // Call backend's generateInviteCode (the one in backend.js) with length arg
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  let code = "";
-  for (let i = 0; i < 8; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  generatedInviteCode = code;
+  // Always fresh — calls backend helper (not itself)
+  generatedInviteCode = generateInviteCodeString(8);
   updateInviteCodeDisplay();
 }
 
@@ -442,42 +459,38 @@ function updateInviteCodeDisplay() {
 
 function handleCreateRoom() {
   const roomName = document.getElementById("create-room-name").value.trim();
-  
-  if (!roomName) {
-    alert("Please enter a room name!");
-    return;
-  }
 
-  if (!playerName) {
-    alert("Please set your player name first!");
-    return;
-  }
+  if (!roomName) { alert("Please enter a room name!"); return; }
+  if (!playerName) { alert("Please set your player name first!"); return; }
 
-  // Use the already-displayed invite code (generated when screen loaded)
-  const roomCode = generatedInviteCode || (function() {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let c = "";
-    for (let i = 0; i < 8; i++) c += chars.charAt(Math.floor(Math.random() * chars.length));
-    return c;
-  })();
+  // Use the code already shown on screen
+  const roomCode = generatedInviteCode || generateInviteCodeString(8);
 
-  // Create multiplayer room
+  // Build room object
   const newRoom = createMultiplayerRoom(roomName, selectedStake, selectedIcon);
-  newRoom.code = roomCode;
-  
-  // Store the room
-  storeMultiplayerRoom(newRoom);
-  createdRoomCode = newRoom.code;
-  createdRoomData = newRoom;
+  newRoom.code  = roomCode;
 
-  // Reset form state
-  document.getElementById("create-room-name").value = "";
-  selectedStake = 50;
-  selectedIcon = "🎮";
-  generatedInviteCode = null;
+  // Disable button to prevent double-submit
+  const createBtn = document.querySelector(".create-footer .btn-primary");
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = "CREATING…"; }
 
-  // Load the room → lobby
-  loadRoom(newRoom);
+  // Save to Firebase → then enter lobby
+  storeMultiplayerRoom(newRoom)
+    .then(() => {
+      createdRoomCode = newRoom.code;
+      createdRoomData = newRoom;
+      document.getElementById("create-room-name").value = "";
+      selectedStake = 50;
+      selectedIcon  = "🎮";
+      generatedInviteCode = null;
+      if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
+      loadRoom(newRoom);
+    })
+    .catch(err => {
+      console.error("Failed to save room:", err);
+      alert("Could not create room — check your Firebase config and internet connection.");
+      if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
+    });
 }
 
 function copyInviteCode() {
@@ -527,27 +540,32 @@ function handleJoinCodeBackdrop(e) {
 
 function submitJoinCode() {
   const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
-  
-  if (!code) {
-    document.getElementById("joinCodeError").textContent = "Please enter an invite code.";
-    return;
-  }
+  const errorEl = document.getElementById("joinCodeError");
 
-  // Search for the room in multiplayer rooms
-  const room = findRoomByCode(code);
+  if (!code) { errorEl.textContent = "Please enter an invite code."; return; }
 
-  if (room) {
-    if (room.players.length >= room.maxPlayers) {
-      document.getElementById("joinCodeError").textContent = "This arena is full!";
-      return;
-    }
-    closeJoinCodeModal();
-    loadRoom(room);
-  } else {
-    document.getElementById("joinCodeError").textContent = "Invalid code. Arena not found.";
-    document.getElementById("joinCodeInput").classList.add("shake");
-    setTimeout(() => document.getElementById("joinCodeInput").classList.remove("shake"), 500);
-  }
+  errorEl.textContent = "Searching…";
+
+  // Always look up in Firebase so rooms from other browsers/devices are found
+  fetchRoomFromFirebase(code)
+    .then(room => {
+      if (!room) {
+        errorEl.textContent = "Invalid code. Arena not found.";
+        document.getElementById("joinCodeInput").classList.add("shake");
+        setTimeout(() => document.getElementById("joinCodeInput").classList.remove("shake"), 500);
+        return;
+      }
+      if ((room.players || []).length >= room.maxPlayers) {
+        errorEl.textContent = "This arena is full!";
+        return;
+      }
+      errorEl.textContent = "";
+      closeJoinCodeModal();
+      loadRoom(room);
+    })
+    .catch(() => {
+      errorEl.textContent = "Network error — please try again.";
+    });
 }
 
 // ── INVITE MODAL ─────────────────────────────────────────────
