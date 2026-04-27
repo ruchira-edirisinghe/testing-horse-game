@@ -12,7 +12,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDqfETGHkrlF-_eLeidqvOHQIZRaNFJDf0",
   authDomain: "testing-horse-game.firebaseapp.com",  
   projectId: "testing-horse-game",
-  databaseURL:       "https://console.firebase.google.com/u/0/project/testing-horse-game/database/testing-horse-game-default-rtdb/data/~2F",
+  databaseURL: "https://testing-horse-game-default-rtdb.asia-southeast1.firebasedatabase.app/",
   storageBucket: "testing-horse-game.firebasestorage.app",
   messagingSenderId: "158202919680",
   appId: "1:158202919680:web:e7197b239d7fefd6dad1e5",
@@ -25,10 +25,14 @@ let db = null;
 function initFirebase() {
   try {
     // Check if the user has replaced the default placeholders
-    const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && !firebaseConfig.apiKey.includes("YOUR_");
+    const isConfigured = firebaseConfig.apiKey && 
+                         firebaseConfig.apiKey !== "YOUR_API_KEY" && 
+                         !firebaseConfig.apiKey.includes("YOUR_") &&
+                         firebaseConfig.databaseURL && 
+                         !firebaseConfig.databaseURL.includes("console.firebase.google.com");
     
     if (!isConfigured) {
-      console.warn("⚠️ Firebase not configured — multiplayer will be local-only (session-based)");
+      console.warn("⚠️ Firebase not correctly configured (check databaseURL) — multiplayer will be local-only");
       return;
     }
 
