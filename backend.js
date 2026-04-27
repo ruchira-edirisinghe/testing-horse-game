@@ -179,10 +179,10 @@ function setPlayerName(name) {
 
 /**
  * Save a brand-new room to Firebase.
- * Returns Promise<code>.
+ * Always resolves — Firebase failure is logged but never blocks room creation.
  */
 function saveRoomToFirebase(roomData) {
-  return new Promise(function(resolve, reject) {
+  return new Promise(function(resolve) {
     if (!db) {
       console.warn("No Firebase db — room stored locally only");
       resolve(roomData.code);
@@ -191,24 +191,24 @@ function saveRoomToFirebase(roomData) {
     db.ref("rooms/" + roomData.code)
       .set(roomData)
       .then(function() {
-        console.log("✅ Room saved:", roomData.code);
+        console.log("✅ Room saved to Firebase:", roomData.code);
         resolve(roomData.code);
       })
       .catch(function(err) {
-        console.error("Firebase save error:", err);
-        reject(err);
+        // Log the error but still let the game continue locally
+        console.warn("Firebase save failed (room still created locally):", err.message || err);
+        resolve(roomData.code);
       });
   });
 }
 
 /**
  * Fetch a room from Firebase by invite code.
- * Returns Promise<room | null>.
+ * Returns Promise<room | null>.  Always resolves.
  */
 function fetchRoomFromFirebase(code) {
-  return new Promise(function(resolve, reject) {
+  return new Promise(function(resolve) {
     if (!db) {
-      // No Firebase — search local fallback array
       var local = (window.multiplayerRooms || []).find(function(r) {
         return r.code.toUpperCase() === code.toUpperCase();
       });
@@ -221,8 +221,11 @@ function fetchRoomFromFirebase(code) {
         resolve(snapshot.val() || null);
       })
       .catch(function(err) {
-        console.error("Firebase fetch error:", err);
-        reject(err);
+        console.warn("Firebase fetch failed, trying local cache:", err.message || err);
+        var local = (window.multiplayerRooms || []).find(function(r) {
+          return r.code.toUpperCase() === code.toUpperCase();
+        });
+        resolve(local || null);
       });
   });
 }

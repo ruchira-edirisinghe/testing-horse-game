@@ -474,7 +474,7 @@ function handleCreateRoom() {
   const createBtn = document.querySelector(".create-footer .btn-primary");
   if (createBtn) { createBtn.disabled = true; createBtn.textContent = "CREATING…"; }
 
-  // Save to Firebase → then enter lobby
+  // Save to Firebase (or locally if Firebase not configured), then enter lobby
   storeMultiplayerRoom(newRoom)
     .then(() => {
       createdRoomCode = newRoom.code;
@@ -486,10 +486,10 @@ function handleCreateRoom() {
       if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
       loadRoom(newRoom);
     })
-    .catch(err => {
-      console.error("Failed to save room:", err);
-      alert("Could not create room — check your Firebase config and internet connection.");
+    .catch(() => {
+      // saveRoomToFirebase always resolves, so this is just a safety net
       if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
+      loadRoom(newRoom);
     });
 }
 
