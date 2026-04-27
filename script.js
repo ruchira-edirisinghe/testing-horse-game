@@ -87,8 +87,8 @@ function showScreen(id) {
 
   // Handle screen-specific initializations
   if (id === "screen-create") {
+    generatedInviteCode = null; // reset so a fresh code is always generated
     generateInviteCode();
-    updateInviteCodeDisplay();
   }
   
   if (id === "screen-rooms") {
@@ -420,9 +420,14 @@ function selectIcon(icon, event) {
 }
 
 function generateInviteCode() {
-  if (!generatedInviteCode) {
-    generatedInviteCode = generateInviteCode(8);
+  // Always generate a fresh code when entering the create room screen
+  // Call backend's generateInviteCode (the one in backend.js) with length arg
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
+  generatedInviteCode = code;
   updateInviteCodeDisplay();
 }
 
@@ -448,22 +453,30 @@ function handleCreateRoom() {
     return;
   }
 
+  // Use the already-displayed invite code (generated when screen loaded)
+  const roomCode = generatedInviteCode || (function() {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let c = "";
+    for (let i = 0; i < 8; i++) c += chars.charAt(Math.floor(Math.random() * chars.length));
+    return c;
+  })();
+
   // Create multiplayer room
   const newRoom = createMultiplayerRoom(roomName, selectedStake, selectedIcon);
-  newRoom.code = generatedInviteCode || generateInviteCode(8);
+  newRoom.code = roomCode;
   
   // Store the room
   storeMultiplayerRoom(newRoom);
   createdRoomCode = newRoom.code;
   createdRoomData = newRoom;
 
-  // Reset form
+  // Reset form state
   document.getElementById("create-room-name").value = "";
   selectedStake = 50;
   selectedIcon = "🎮";
   generatedInviteCode = null;
 
-  // Load the room
+  // Load the room → lobby
   loadRoom(newRoom);
 }
 
