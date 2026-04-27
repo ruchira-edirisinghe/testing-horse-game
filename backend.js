@@ -12,7 +12,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyDqfETGHkrlF-_eLeidqvOHQIZRaNFJDf0",
   authDomain: "testing-horse-game.firebaseapp.com",  
   projectId: "testing-horse-game",
-  databaseURL: "https://testing-horse-game-default-rtdb.firebaseio.com/",
+  databaseURL:       "https://console.firebase.google.com/u/0/project/testing-horse-game/database/testing-horse-game-default-rtdb/data/~2F",
   storageBucket: "testing-horse-game.firebasestorage.app",
   messagingSenderId: "158202919680",
   appId: "1:158202919680:web:e7197b239d7fefd6dad1e5",
