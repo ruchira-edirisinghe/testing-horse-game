@@ -57,7 +57,7 @@ function changePlayerName() {
 }
 
 // ── MULTIPLAYER ROOM TRACKING ──────────────────────────────
-let multiplayerRooms = [];  // local cache (used for rooms list display)
+var multiplayerRooms = [];  // local cache (used for rooms list display)
 let createdRoomCode = null;
 let createdRoomData = null;
 
@@ -471,7 +471,7 @@ function handleCreateRoom() {
   newRoom.code  = roomCode;
 
   // Disable button to prevent double-submit
-  const createBtn = document.querySelector(".create-footer .btn-primary");
+  const createBtn = document.querySelector(".btn-create-final");
   if (createBtn) { createBtn.disabled = true; createBtn.textContent = "CREATING…"; }
 
   // Save to Firebase (or locally if Firebase not configured), then enter lobby

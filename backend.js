@@ -8,13 +8,15 @@
 // Steps: console.firebase.google.com → New project → Realtime Database
 //        → Create database (test mode) → Project Settings → Your apps → Config
 const firebaseConfig = {
-  apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT.firebaseapp.com",
-  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
-  projectId:         "YOUR_PROJECT",
-  storageBucket:     "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_SENDER_ID",
-  appId:             "YOUR_APP_ID"
+
+  apiKey: "AIzaSyDqfETGHkrlF-_eLeidqvOHQIZRaNFJDf0",
+  authDomain: "testing-horse-game.firebaseapp.com",  
+  projectId: "testing-horse-game",
+  databaseURL:       "https://console.firebase.google.com/u/0/project/testing-horse-game/database/testing-horse-game-default-rtdb/data/~2F",
+  storageBucket: "testing-horse-game.firebasestorage.app",
+  messagingSenderId: "158202919680",
+  appId: "1:158202919680:web:e7197b239d7fefd6dad1e5",
+  measurementId: "G-713DJRXSN2"
 };
 
 // ── FIREBASE INIT ────────────────────────────────────────────
@@ -22,6 +24,14 @@ let db = null;
 
 function initFirebase() {
   try {
+    // Check if the user has replaced the default placeholders
+    const isConfigured = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" && !firebaseConfig.apiKey.includes("YOUR_");
+    
+    if (!isConfigured) {
+      console.warn("⚠️ Firebase not configured — multiplayer will be local-only (session-based)");
+      return;
+    }
+
     if (typeof firebase !== "undefined" && !firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
       db = firebase.database();
