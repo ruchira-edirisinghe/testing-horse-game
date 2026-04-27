@@ -1,6 +1,26 @@
 // ═══════════════════════════════════════════════════════════
 //  BACKEND.JS — Data Layer, Game State, Physics & Payout
+//  MULTIPLAYER ENABLED — Firebase Realtime Database Integration
 // ═══════════════════════════════════════════════════════════
+
+// ── FIREBASE CONFIG ──────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyBNZ0_YOUR_API_KEY_HERE",
+  authDomain: "horse-racing-game.firebaseapp.com",
+  databaseURL: "https://horse-racing-game-default-rtdb.firebaseio.com",
+  projectId: "horse-racing-game",
+  storageBucket: "horse-racing-game.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
+
+// ── MULTIPLAYER STATE ────────────────────────────────────────
+let playerName = null;
+let playerId = null;
+let currentRoomCode = null;
+let currentPlayers = [];
+let playerListenersActive = {};
+let db = null;  // Firebase Realtime Database reference
 
 // ── ROOM DATA ────────────────────────────────────────────────
 const PUBLIC_ROOMS = [
@@ -14,7 +34,7 @@ const PUBLIC_ROOMS = [
     tagLabel: "⚡ FAST PLAY",
     stake: 50,
     players: ["Cyber_Viper", "ShadowRider", "NeonGhost"],
-    maxPlayers: 6,
+    maxPlayers: 8,
     track: "Thunder Downs",
     distance: "1200m",
     password: null,
@@ -44,7 +64,7 @@ const PUBLIC_ROOMS = [
     tagLabel: "★ RANKED",
     stake: 50,
     players: ["DarkHorsePro", "VaultRider"],
-    maxPlayers: 4,
+    maxPlayers: 8,
     track: "Midnight Circuit",
     distance: "1600m",
     password: "derby99",
@@ -59,39 +79,9 @@ const PUBLIC_ROOMS = [
     tagLabel: "⚡ FAST PLAY",
     stake: 100,
     players: ["Blazing_Saddle", "QuickWhip", "DustDevil", "SteelSpurs", "TrailBlazer"],
-    maxPlayers: 6,
+    maxPlayers: 8,
     track: "Dust Bowl Flats",
     distance: "800m",
-    password: null,
-  },
-  {
-    id: 5,
-    name: "Private Match #517",
-    host: "Phantom_Jockey",
-    icon: "🔒",
-    type: "private",
-    tag: "ranked",
-    tagLabel: "★ RANKED",
-    stake: 200,
-    players: ["Phantom_Jockey"],
-    maxPlayers: 4,
-    track: "Eclipse Raceway",
-    distance: "2400m",
-    password: "elite2024",
-  },
-  {
-    id: 6,
-    name: "Street_Gallop_Open",
-    host: "Street_King",
-    icon: "🎮",
-    type: "open",
-    tag: "fast",
-    tagLabel: "⚡ FAST PLAY",
-    stake: 25,
-    players: ["Street_King", "Nitro_Hooves"],
-    maxPlayers: 8,
-    track: "Neon Strip",
-    distance: "1000m",
     password: null,
   },
 ];
@@ -115,7 +105,7 @@ let velocities    = [];
 let animFrame     = null;
 let raceCount     = 0;
 let history       = [];
-let activeRoom    = null;   // currently joined room object
+let activeRoom    = null;
 
 const TRACK_START = 3;
 const TRACK_END   = 85;
@@ -123,6 +113,51 @@ const MAX_HISTORY = 10;
 
 // ── NAVIGATION STACK ─────────────────────────────────────────
 let screenStack = ["screen-home"];
+
+// ── UTILITY: GENERATE INVITE CODES ──────────────────────────
+function generateInviteCode(length = 8) {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  let code = "";
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+// ── UTILITY: GENERATE UNIQUE PLAYER ID ──────────────────────
+function generatePlayerId() {
+  return "player_" + Date.now() + "_" + Math.random().toString(36).substr(2, 9);
+}
+
+// ── PLAYER NAME VALIDATION ──────────────────────────────────
+function validatePlayerName(name) {
+  if (!name || name.trim().length === 0) {
+    return { valid: false, reason: "Player name cannot be empty." };
+  }
+  if (name.length > 20) {
+    return { valid: false, reason: "Player name must be 20 characters or less." };
+  }
+  if (!/^[a-zA-Z0-9_-]+$/.test(name)) {
+    return { valid: false, reason: "Player name can only contain letters, numbers, underscore, and hyphen." };
+  }
+  if (currentPlayers.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    return { valid: false, reason: "This player name is already taken in this room!" };
+  }
+  return { valid: true };
+}
+
+// ── SET PLAYER NAME (called when joining) ──────────────────
+function setPlayerName(name) {
+  const validation = validatePlayerName(name);
+  if (!validation.valid) {
+    return validation;
+  }
+  playerName = name;
+  if (!playerId) {
+    playerId = generatePlayerId();
+  }
+  return { valid: true };
+}
 
 // ── PHYSICS ENGINE ───────────────────────────────────────────
 function initVelocities() {
@@ -158,7 +193,7 @@ function validateBet(horseIndex, betAmount) {
 
 // ── HISTORY ──────────────────────────────────────────────────
 function recordResult(horse, won, net, bet, allBets = []) {
-  history.unshift({ horse, won, net, bet, allBets });
+  history.unshift({ horse, won, net, bet, allBets, playerName });
   if (history.length > MAX_HISTORY) history.pop();
 }
 
@@ -168,4 +203,44 @@ function darken(hex) {
   const g = parseInt(hex.slice(3,5),16);
   const b = parseInt(hex.slice(5,7),16);
   return `rgb(${Math.floor(r*0.65)},${Math.floor(g*0.65)},${Math.floor(b*0.65)})`;
+}
+
+// ── MULTIPLAYER ROOM CREATION ────────────────────────────────
+function createMultiplayerRoom(roomName, stake, icon) {
+  const roomCode = generateInviteCode(8);
+  const newRoom = {
+    id: "mp_" + Date.now(),
+    code: roomCode,
+    name: roomName,
+    host: playerName,
+    hostId: playerId,
+    icon: icon,
+    type: "open",
+    tag: "fast",
+    tagLabel: "⚡ FAST PLAY",
+    stake: stake,
+    players: [playerName],
+    playerList: [{ id: playerId, name: playerName, ready: false, joinedAt: Date.now() }],
+    maxPlayers: 8,
+    track: "Dynamic Track",
+    distance: "2000m",
+    password: null,
+    createdAt: Date.now(),
+    started: false,
+  };
+  return newRoom;
+}
+
+// ── MULTIPLAYER ROOM JOIN ───────────────────────────────────
+function joinMultiplayerRoom(roomCode, nameToJoin) {
+  const validation = validatePlayerName(nameToJoin);
+  if (!validation.valid) {
+    return validation;
+  }
+  playerName = nameToJoin;
+  if (!playerId) {
+    playerId = generatePlayerId();
+  }
+  currentRoomCode = roomCode;
+  return { valid: true };
 }

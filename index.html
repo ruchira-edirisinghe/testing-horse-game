@@ -3,13 +3,37 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Horse Racing Elite</title>
+  <title>Horse Racing Elite - Multiplayer</title>
   <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Bebas+Neue&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.5.0/firebase-database.js"></script>
 </head>
 <body>
 <div id="dotted-surface-container"></div>
+
+<!-- ══════════════════════════════════════════
+     PLAYER NAME MODAL (entry point for multiplayer)
+══════════════════════════════════════════ -->
+<div id="modal-player-name" class="modal-overlay open">
+  <div class="modal-box player-name-modal-box">
+    <div class="player-name-icon">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+    </div>
+    <div class="modal-title">ENTER YOUR NAME</div>
+    <p class="modal-body">Choose a racing name for this session. Max 20 characters, letters/numbers/underscore only.</p>
+    <input type="text" id="playerNameInput" class="modal-input" placeholder="e.g. ShadowRider" maxlength="20" onkeydown="if(event.key==='Enter')submitPlayerName()"/>
+    <div class="modal-error" id="playerNameError"></div>
+    <div class="modal-btns">
+      <button class="btn-primary small" onclick="submitPlayerName()" style="width:100%">ENTER THE ARENA</button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════
      SCREEN 1 — HOME
@@ -21,12 +45,15 @@
       Back
     </button>
     <div class="top-bar-right">
+      <div class="player-badge" id="playerBadge" style="display:none">
+        <span class="player-name-badge" id="playerNameBadge">Anonymous</span>
+      </div>
       <div class="credits-badge">
         <span class="credits-num">1,250</span>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
       </div>
       <div class="avatar-chip">
-        <div class="avatar-inner"><img src="assets/profile.jpg" alt="Profile"/></div>
+        <div class="avatar-inner" id="playerAvatar">👤</div>
         <div class="avatar-online-dot"></div>
       </div>
     </div>
@@ -62,7 +89,7 @@
 </div>
 
 <!-- ══════════════════════════════════════════
-     SCREEN 2 — CREATE ROOM (placeholder)
+     SCREEN 2 — CREATE ROOM
 ══════════════════════════════════════════ -->
 <div id="screen-create" class="screen">
   <div class="sub-top-bar">
@@ -77,8 +104,6 @@
     
     <div class="create-form">
       <input type="text" id="create-room-name" placeholder="Enter Room Name" class="create-input">
-      
-
       
       <div class="dropdown-group" onclick="toggleDropdown('stake-options')">
         <label>Edit Stake</label>
@@ -106,8 +131,8 @@
         <div id="icon-options" class="options-list">
           <div onclick="selectIcon('🎮', event)">🎮 Gaming</div>
           <div onclick="selectIcon('🐎', event)">🐎 Racing</div>
-          <div onclick="selectIcon('🔒', event)">🔒 Private</div>
           <div onclick="selectIcon('🏆', event)">🏆 Trophy</div>
+          <div onclick="selectIcon('⚡', event)">⚡ Thunder</div>
         </div>
       </div>
       
@@ -116,16 +141,16 @@
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
           <h2>INVITE A FRIEND</h2>
         </div>
-        <p class="invite-desc">Invite your friend to the lobby with invite code or link.</p>
+        <p class="invite-desc">Your unique invite code will be generated when you create the room.</p>
         
-        <div class="invite-code-row">
-          <input type="text" id="invite-code-val" value="NEON-X-9921" readonly>
-          <button class="btn-icon-copy" onclick="copyInviteCode()">
+        <div class="invite-code-row" id="inviteCodeRow" style="opacity:0.5">
+          <input type="text" id="invite-code-val" value="---- ----" readonly>
+          <button class="btn-icon-copy" onclick="copyInviteCode()" disabled>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
           </button>
         </div>
         
-        <button class="btn-share-link" onclick="shareInviteLink()">
+        <button class="btn-share-link" onclick="shareInviteLink()" disabled id="shareInviteBtn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
           SHARE LINK
         </button>
@@ -184,12 +209,10 @@
     </div>
   </div>
 </div>
-</div>
-
 
 <!-- ══════════════════════════════════════════
      JOIN BY CODE MODAL (overlay)
-     ══════════════════════════════════════════ -->
+══════════════════════════════════════════ -->
 <div id="modal-join-code" class="modal-overlay" onclick="handleJoinCodeBackdrop(event)">
   <div class="modal-box join-code-modal-box">
     <div class="modal-lock-icon">
@@ -197,7 +220,7 @@
     </div>
     <div class="modal-title">ENTER INVITE CODE</div>
     <p class="modal-body">Enter the secret arena code shared by your friend to enter the gates.</p>
-    <input type="text" id="joinCodeInput" class="modal-input" placeholder="e.g. NEON-X-9921" oninput="this.value = this.value.toUpperCase()" onkeydown="if(event.key==='Enter')submitJoinCode()"/>
+    <input type="text" id="joinCodeInput" class="modal-input" placeholder="e.g. ABC1XYZ9" oninput="this.value = this.value.toUpperCase()" onkeydown="if(event.key==='Enter')submitJoinCode()"/>
     <div class="modal-error" id="joinCodeError"></div>
     <div class="modal-btns">
       <button class="btn-ghost" onclick="closeJoinCodeModal()">Cancel</button>
@@ -205,7 +228,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- ══════════════════════════════════════════
      LEAVE CONFIRMATION MODAL (overlay)
@@ -296,7 +318,7 @@
 
 <!-- ══════════════════════════════════════════
      INVITE MODAL (overlay)
-     ══════════════════════════════════════════ -->
+══════════════════════════════════════════ -->
 <div id="modal-invite" class="modal-overlay" onclick="handleInviteBackdrop(event)">
   <div class="modal-box invite-modal-box">
     <div class="invite-header">
