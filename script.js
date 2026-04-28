@@ -1062,6 +1062,8 @@ function buildRaceScreenHTML() {
   .game-horse-card:hover{border-color:var(--gold-dim);background:var(--bg-card-2);transform:translateY(-2px)}
   .game-horse-card.selected{border-color:var(--gold);background:rgba(201,162,39,0.06);box-shadow:0 0 20px rgba(201,162,39,0.15)}
   .game-horse-card.selected::after{content:'✓ SELECTED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px}
+  .game-horse-card.confirmed{border-color:#00ff88;background:rgba(0,255,136,0.05)}
+  .game-horse-card.confirmed::after{content:'🔒 LOCKED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:800;color:#00ff88;letter-spacing:1px}
   .game-horse-card.winner{border-color:#00ff88;background:#002215;animation:gwinner 1s ease infinite alternate}
   @keyframes gwinner{from{box-shadow:0 0 6px rgba(0,255,136,0.2)}to{box-shadow:0 0 20px rgba(0,255,136,0.5)}}
 
@@ -1364,6 +1366,7 @@ function initRaceGame() {
 
   if (bettingInterval) clearInterval(bettingInterval);
   bettingInterval = setInterval(tickBettingTimer, 1000);
+  tickBettingTimer(); // Run once immediately
   
   gameRenderLiveBets();
 }
@@ -1374,7 +1377,16 @@ function tickBettingTimer() {
     return;
   }
 
-  bettingTimerSecs--;
+  // Calculate time remaining based on the global timestamp from Firebase
+  let now = Date.now();
+  let remaining = 0;
+  if (activeRoom && activeRoom.bettingEndTime) {
+    remaining = Math.max(0, Math.ceil((activeRoom.bettingEndTime - now) / 1000));
+  } else {
+    // Fallback if room data hasn't loaded yet
+    remaining = bettingTimerSecs;
+    if (remaining > 0) bettingTimerSecs--;
+  }
   
   const timerCell = document.getElementById("gameHeaderTimerCell");
   const roomCell  = document.getElementById("gameRoomNameCell");
@@ -1385,25 +1397,34 @@ function tickBettingTimer() {
     timerCell.style.display = "block";
     roomCell.style.display = "none";
     timerLbl.textContent = "BETTING ENDS";
-    timerVal.textContent = bettingTimerSecs + "s";
+    timerVal.textContent = remaining + "s";
     
-    if (bettingTimerSecs <= 10) {
+    if (remaining <= 10) {
       timerVal.style.color = "#ff4444";
     } else {
       timerVal.style.color = "var(--gold-light)";
     }
   }
 
-  // Auto-reveal logic or trigger countdown if 0
-  if (bettingTimerSecs <= 0) {
+  // GLOBAL SYNC: Only start the race when the shared timer hits 0
+  if (remaining <= 0) {
     clearInterval(bettingInterval);
-    // If user hasn't selected anything, we'll force selection or just start?
-    // Let's assume we start. If no horse selected, the existing validation in gameStartRace will handle it.
-    // Or we handle it here:
+    
+    // Auto-select a random horse if player didn't pick one
     if (gameSelectedHorse < 0) {
       gameSelectHorse(Math.floor(Math.random() * horses.length));
     }
-    gameStartRace(); // This will now trigger the countdown flow
+    
+    // Automatically transition to the countdown
+    gamePhase = "countdown";
+    const btn = document.getElementById("gameRaceBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "RACING...";
+    }
+    
+    const betAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
+    startRaceCountdown(betAmt);
   }
 
   gameRenderLiveBets();
@@ -1504,20 +1525,20 @@ function gameStartRace() {
   const check  = validateBet(gameSelectedHorse, betAmt);
   if (!check.valid) { alert(check.reason); return; }
 
-  // If in betting phase, move to countdown
+  // LOCK IN BET: Instead of starting immediately, we just mark as confirmed.
+  // The actual race start is triggered by the global timer in tickBettingTimer().
   if (gamePhase === "betting") {
-    gamePhase = "countdown";
-    clearInterval(bettingInterval);
     isBetConfirmed = true;
-    
     const btn = document.getElementById("gameRaceBtn");
     if (btn) {
       btn.disabled = true;
-      btn.textContent = "WAITING...";
+      btn.textContent = "BET CONFIRMED";
     }
+    // Highlight the selected card to show it's locked
+    const selectedCard = document.getElementById("gcard" + gameSelectedHorse);
+    if (selectedCard) selectedCard.classList.add("confirmed");
     
-    gameRenderLiveBets(); // Reveal AI bets
-    startRaceCountdown(betAmt);
+    gameRenderLiveBets();
     return;
   }
 }
@@ -1554,6 +1575,11 @@ function startRaceCountdown(betAmt) {
 }
 
 function executeRace(betAmt) {
+  // Sync physics seed with the room's global seed
+  if (activeRoom && activeRoom.raceSeed) {
+    syncSeed(activeRoom.raceSeed);
+  }
+
   balance -= betAmt;
   gameRacing = true;
   raceCount++;

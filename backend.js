@@ -287,7 +287,9 @@ function startFirebaseRoom(code) {
   if (!db) return Promise.resolve();
   return db.ref("rooms/" + code.toUpperCase()).update({
     started: true,
-    lastActivity: Date.now()
+    lastActivity: Date.now(),
+    bettingEndTime: Date.now() + 30000, // 30s for betting
+    raceSeed: Math.random() // Seed for synchronized race outcome
   });
 }
 
@@ -309,11 +311,11 @@ function listenToAllRooms(onUpdate) {
 }
 
 /**
- * Deletes rooms that haven't shown activity for 12 hours.
+ * Deletes rooms that haven't shown activity for 2 hours.
  */
 function cleanupExpiredRooms(rooms) {
   if (!db || !rooms.length) return;
-  var EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 hours
+  var EXPIRY_MS = 2 * 60 * 60 * 1000; // 2 hours
   var now = Date.now();
   
   rooms.forEach(function(room) {
@@ -368,17 +370,27 @@ function createMultiplayerRoom(roomName, stake, icon, isPrivate, password) {
   };
 }
 
-// ── PHYSICS ENGINE ───────────────────────────────────────────
+// ── PHYSICS ENGINE (Seeded for Multiplayer Sync) ────────────
+var _rngSeed = 1;
+function seededRandom() {
+  var x = Math.sin(_rngSeed++) * 10000;
+  return x - Math.floor(x);
+}
+
+function syncSeed(seed) {
+  _rngSeed = seed || 1;
+}
+
 function initVelocities() {
   return horses.map(function(h) {
     var base = (h.speed * 0.6 + h.stamina * 0.4) / 100;
-    return base * 0.55 + Math.random() * 0.1;
+    return base * 0.55 + seededRandom() * 0.1;
   });
 }
 
 function tickHorse(i, tick) {
-  var wobble  = (Math.random() - 0.5) * 0.22;
-  var burst   = Math.random() < 0.035 ? 0.25 : 0;
+  var wobble  = (seededRandom() - 0.5) * 0.22;
+  var burst   = seededRandom() < 0.035 ? 0.25 : 0;
   var fatigue = tick > 120 ? -0.002 : 0;
   velocities[i] = Math.max(0.18, Math.min(1.2, velocities[i] + wobble + burst + fatigue));
   positions[i] += velocities[i] * 0.2;
