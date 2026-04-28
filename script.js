@@ -7,6 +7,17 @@
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();   // Connect to Firebase Realtime Database
   initDottedSurface();
+  
+  // Listen for all multiplayer rooms globally
+  listenToAllRooms(rooms => {
+    multiplayerRooms = rooms;
+    // If we are on the rooms screen, re-render to show new rooms
+    const roomsScreen = document.getElementById("screen-rooms");
+    if (roomsScreen && roomsScreen.classList.contains("active")) {
+      renderRooms();
+    }
+  });
+
   // Show player name modal on first load
   setTimeout(() => {
     document.getElementById('modal-player-name').classList.add('open');
@@ -223,6 +234,12 @@ function handleJoinRoom(room) {
   if (typeof room === "string") room = JSON.parse(room);
   pendingRoom = room;
 
+  // If private room, ask for password
+  if (room.type === "private" && room.password && room.hostId !== playerId) {
+    openRoomPasswordModal();
+    return;
+  }
+
   // If multiplayer room, ask for player name confirmation
   if (room.code) {
     loadRoom(pendingRoom);
@@ -230,6 +247,40 @@ function handleJoinRoom(room) {
     // Public room
     pendingRoom = PUBLIC_ROOMS.find(r => r.id === room.id) || room;
     loadRoom(pendingRoom);
+  }
+}
+
+// ── ROOM PASSWORD MODAL ───────────────────────────────────────
+
+function openRoomPasswordModal() {
+  document.getElementById("roomPasswordInput").value = "";
+  document.getElementById("roomPasswordError").textContent = "";
+  document.getElementById("modal-room-password").classList.add("open");
+  setTimeout(() => document.getElementById("roomPasswordInput").focus(), 100);
+}
+
+function closeRoomPasswordModal() {
+  document.getElementById("modal-room-password").classList.remove("open");
+  pendingRoom = null;
+}
+
+function handleRoomPasswordBackdrop(e) {
+  if (e.target === document.getElementById("modal-room-password")) closeRoomPasswordModal();
+}
+
+function submitRoomPassword() {
+  const input = document.getElementById("roomPasswordInput").value.trim();
+  const error = document.getElementById("roomPasswordError");
+  
+  if (!pendingRoom) return;
+  
+  if (input === pendingRoom.password) {
+    const roomToLoad = pendingRoom;
+    document.getElementById("modal-room-password").classList.remove("open");
+    loadRoom(roomToLoad);
+  } else {
+    error.textContent = "Incorrect password! Access denied.";
+    // Subtle shake effect could be added here
   }
 }
 
@@ -447,6 +498,11 @@ function toggleDropdown(id) {
   dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
 }
 
+function togglePasswordInput(show) {
+  const wrap = document.getElementById("password-input-wrap");
+  if (wrap) wrap.style.display = show ? "block" : "none";
+}
+
 function selectStake(amount, event) {
   event.stopPropagation();
   selectedStake = amount;
@@ -478,15 +534,18 @@ function updateInviteCodeDisplay() {
 
 function handleCreateRoom() {
   const roomName = document.getElementById("create-room-name").value.trim();
+  const isPrivate = document.getElementById("create-is-private").checked;
+  const password  = document.getElementById("create-room-pass").value.trim();
 
   if (!roomName) { alert("Please enter a room name!"); return; }
+  if (isPrivate && !password) { alert("Please enter a password for your private arena!"); return; }
   if (!playerName) { alert("Please set your player name first!"); return; }
 
   // Use the code already shown on screen
   const roomCode = generatedInviteCode || generateInviteCodeString(8);
 
   // Build room object
-  const newRoom = createMultiplayerRoom(roomName, selectedStake, selectedIcon);
+  const newRoom = createMultiplayerRoom(roomName, selectedStake, selectedIcon, isPrivate, password);
   newRoom.code  = roomCode;
 
   // Disable button to prevent double-submit

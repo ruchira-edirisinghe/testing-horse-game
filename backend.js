@@ -289,6 +289,20 @@ function startFirebaseRoom(code) {
 }
 
 /**
+ * Subscribe to all rooms for the public room list.
+ */
+function listenToAllRooms(onUpdate) {
+  if (!db) return function() {};
+  var ref = db.ref("rooms");
+  ref.on("value", function(snapshot) {
+    var data = snapshot.val() || {};
+    var roomsArray = Object.values(data);
+    onUpdate(roomsArray);
+  });
+  return function() { ref.off("value"); };
+}
+
+/**
  * Subscribe to live updates for a room.
  * onUpdate(room) is called every time Firebase data changes.
  * Returns an unsubscribe function — call it when leaving the lobby.
@@ -304,7 +318,7 @@ function listenToRoom(code, onUpdate) {
 }
 
 // ── MULTIPLAYER ROOM CREATION (builds the object) ────────────
-function createMultiplayerRoom(roomName, stake, icon) {
+function createMultiplayerRoom(roomName, stake, icon, isPrivate, password) {
   var roomCode = generateInviteCodeString(8);
   return {
     id:         "mp_" + Date.now(),
@@ -313,9 +327,9 @@ function createMultiplayerRoom(roomName, stake, icon) {
     host:       playerName,
     hostId:     playerId,
     icon:       icon,
-    type:       "open",
-    tag:        "fast",
-    tagLabel:   "⚡ FAST PLAY",
+    type:       isPrivate ? "private" : "open",
+    tag:        isPrivate ? "private" : "fast",
+    tagLabel:   isPrivate ? "🔒 PRIVATE" : "⚡ FAST PLAY",
     stake:      stake,
     players:    [playerName],
     playerList: [
@@ -324,7 +338,7 @@ function createMultiplayerRoom(roomName, stake, icon) {
     maxPlayers: 8,
     track:      "Thunder Downs",
     distance:   "1200m",
-    password:   null,
+    password:   isPrivate ? password : null,
     createdAt:  Date.now(),
     started:    false,
   };
