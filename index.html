@@ -92,97 +92,102 @@
      SCREEN 2 — CREATE ROOM
 ══════════════════════════════════════════ -->
 <div id="screen-create" class="screen">
-  <div class="sub-top-bar">
-    <button class="btn-back gold-themed" onclick="goBack()">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
-      Back
-    </button>
-  </div>
-  
-  <div class="create-room-content">
-    <h1 class="create-title">CREATE A NEW ROOM</h1>
+  <div class="create-room-inner">
+    <div class="sub-top-bar">
+      <button class="btn-back gold-themed" onclick="goBack()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Back
+      </button>
+    </div>
     
-    <div class="create-form">
-      <input type="text" id="create-room-name" placeholder="Enter Room Name" class="create-input">
+    <div class="create-room-content">
+      <h1 class="create-title">CREATE A NEW ROOM</h1>
       
-      <div class="dropdown-group" onclick="toggleDropdown('stake-options')">
-        <label>Edit Stake</label>
-        <div class="custom-select">
-          <span id="selected-stake">50 CREDITS 🪙</span>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </div>
-        <div id="stake-options" class="options-list">
-          <div onclick="selectStake(25, event)">25 CREDITS 🪙</div>
-          <div onclick="selectStake(50, event)">50 CREDITS 🪙</div>
-          <div onclick="selectStake(100, event)">100 CREDITS 🪙</div>
-          <div onclick="selectStake(200, event)">200 CREDITS 🪙</div>
-          <div onclick="selectStake(500, event)">500 CREDITS 🪙</div>
-        </div>
-      </div>
-
-      <div class="dropdown-group" onclick="toggleDropdown('icon-options')">
-        <label>Edit Icon</label>
-        <div class="custom-select">
-          <div class="selected-icon-wrap">
-            <span id="selected-icon">🎮</span>
+      <div class="create-form">
+        <input type="text" id="create-room-name" placeholder="Enter Room Name" class="create-input">
+        
+        <div class="dropdown-group" onclick="toggleDropdown('stake-options')">
+          <label>Edit Stake</label>
+          <div class="custom-select">
+            <span id="selected-stake">50 CREDITS 🪙</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
           </div>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
-        </div>
-        <div id="icon-options" class="options-list">
-          <div onclick="selectIcon('🎮', event)">🎮 Gaming</div>
-          <div onclick="selectIcon('🐎', event)">🐎 Racing</div>
-          <div onclick="selectIcon('🏆', event)">🏆 Trophy</div>
-          <div onclick="selectIcon('⚡', event)">⚡ Thunder</div>
-        </div>
-      </div>
-
-      <div class="privacy-toggle-group">
-        <div class="privacy-row">
-          <div class="privacy-info">
-            <div class="privacy-label">PRIVATE ARENA</div>
-            <div class="privacy-desc">Only players with password can join</div>
+          <div id="stake-options" class="options-list">
+            <div onclick="selectStake(25, event)">25 CREDITS 🪙</div>
+            <div onclick="selectStake(50, event)">50 CREDITS 🪙</div>
+            <div onclick="selectStake(100, event)">100 CREDITS 🪙</div>
+            <div onclick="selectStake(200, event)">200 CREDITS 🪙</div>
+            <div onclick="selectStake(500, event)">500 CREDITS 🪙</div>
           </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="create-is-private" onchange="togglePasswordInput(this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
+        </div>
+
+        <div class="dropdown-group" onclick="toggleDropdown('icon-options')">
+          <label>Edit Icon</label>
+          <div class="custom-select">
+            <div class="selected-icon-wrap">
+              <span id="selected-icon">🎮</span>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div id="icon-options" class="options-list">
+            <div onclick="selectIcon('🎮', event)">🎮 Gaming</div>
+            <div onclick="selectIcon('🐎', event)">🐎 Racing</div>
+            <div onclick="selectIcon('🏆', event)">🏆 Trophy</div>
+            <div onclick="selectIcon('⚡', event)">⚡ Thunder</div>
+          </div>
+        </div>
+
+        <div class="privacy-toggle-group">
+          <div class="privacy-row">
+            <div class="privacy-info">
+              <div class="privacy-label">PRIVATE ARENA</div>
+              <div class="privacy-desc">Only players with password can join</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="create-is-private" onchange="togglePasswordInput(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          
+          <div id="password-input-wrap" class="password-input-wrap" style="display:none">
+            <div class="password-field">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+              <input type="password" id="create-room-pass" placeholder="Enter Arena Password" class="create-input mini">
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('create-room-pass')">
+                <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
         </div>
         
-        <div id="password-input-wrap" class="password-input-wrap" style="display:none">
-          <div class="password-field">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
-            <input type="text" id="create-room-pass" placeholder="Enter Arena Password" class="create-input mini">
+        <div class="invite-card">
+          <div class="invite-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+            <h2>INVITE A FRIEND</h2>
           </div>
-        </div>
-      </div>
-      
-      <div class="invite-card">
-        <div class="invite-header">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
-          <h2>INVITE A FRIEND</h2>
-        </div>
-        <p class="invite-desc">Your unique invite code will be generated when you create the room.</p>
-        
-        <div class="invite-code-row" id="inviteCodeRow" style="opacity:0.5">
-          <input type="text" id="invite-code-val" value="---- ----" readonly>
-          <button class="btn-icon-copy" onclick="copyInviteCode()" disabled>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+          <p class="invite-desc">Your unique invite code will be generated when you create the room.</p>
+          
+          <div class="invite-code-row" id="inviteCodeRow" style="opacity:0.5">
+            <input type="text" id="invite-code-val" value="---- ----" readonly>
+            <button class="btn-icon-copy" onclick="copyInviteCode()" disabled>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+            </button>
+          </div>
+          
+          <button class="btn-share-link" onclick="shareInviteLink()" disabled id="shareInviteBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+            SHARE LINK
           </button>
         </div>
-        
-        <button class="btn-share-link" onclick="shareInviteLink()" disabled id="shareInviteBtn">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
-          SHARE LINK
-        </button>
       </div>
     </div>
-  </div>
-  
-  <div class="create-footer">
-    <button class="btn-create-final" onclick="handleCreateRoom()">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      CREATE ROOM
-    </button>
+    
+    <div class="create-footer">
+      <button class="btn-create-final" onclick="handleCreateRoom()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        CREATE ROOM
+      </button>
+    </div>
   </div>
 </div>
 
@@ -210,6 +215,15 @@
       <span class="live-label">LIVE ARENAS</span>
     </div>
     <span class="online-count">24 JOCKEYS ONLINE</span>
+  </div>
+
+  <div class="rooms-search-wrap">
+    <div class="rooms-search-inner">
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="roomSearchInput" placeholder="Search by arena name..." oninput="renderRooms()">
+      </div>
+    </div>
   </div>
 
   <div class="rooms-scroll">
@@ -241,7 +255,12 @@
     </div>
     <div class="modal-title">ARENA PASSWORD</div>
     <p class="modal-body">This is a private arena. Please enter the password to enter the gates.</p>
-    <input type="text" id="roomPasswordInput" class="modal-input" placeholder="Enter Password" onkeydown="if(event.key==='Enter')submitRoomPassword()"/>
+    <div class="modal-input-wrap password-toggle-wrap">
+      <input type="password" id="roomPasswordInput" class="modal-input" placeholder="Enter Password" onkeydown="if(event.key==='Enter')submitRoomPassword()"/>
+      <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('roomPasswordInput')">
+        <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
     <div class="modal-error" id="roomPasswordError"></div>
     <div class="modal-btns">
       <button class="btn-ghost" onclick="closeRoomPasswordModal()">Cancel</button>

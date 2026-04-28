@@ -2203,3 +2203,176 @@ input:checked + .toggle-slider:before { transform: translateX(20px); background-
   font-size: 13px;
 }
 .create-input.mini:focus { box-shadow: none; }
+
+/* ── Desktop Popup for Create Room ── */
+@media (min-width: 1024px) {
+  #screen-create {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(15px);
+    z-index: 1000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  #screen-create.active {
+    display: flex;
+  }
+  #screen-create { background: transparent; }
+
+  .create-room-inner {
+    width: 100%;
+    max-width: 800px; /* Increased width */
+    background: var(--bg-card);
+    border: 1px solid var(--border-gold);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 40px 100px rgba(0,0,0,0.7);
+    display: flex;
+    flex-direction: column;
+    max-height: 95vh;
+    overflow: hidden; /* Remove scroll if possible */
+    position: relative;
+    animation: modalPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  #screen-create .sub-top-bar {
+    padding: 30px 40px 10px;
+    background: transparent;
+    border: none;
+  }
+  #screen-create .create-room-content {
+    padding: 10px 40px 30px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+  }
+  
+  #screen-create .create-title {
+    grid-column: span 2;
+    margin-bottom: 0;
+  }
+
+  #screen-create .create-form {
+    display: contents; /* Allow children to be part of the grid */
+  }
+
+  #screen-create .create-input {
+    grid-column: span 2;
+  }
+
+  #screen-create .invite-card {
+    grid-column: span 2;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+  }
+  #screen-create .invite-header { margin-bottom: 0; }
+  #screen-create .invite-desc { display: none; }
+  
+  #screen-create .invite-code-row {
+    grid-column: 2;
+    margin: 0;
+  }
+
+  #screen-create .btn-share-link {
+    grid-column: span 2; /* Full width */
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  #screen-create .create-footer {
+    position: relative;
+    padding: 24px 40px 40px;
+    background: rgba(255,255,255,0.03);
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: flex-end;
+  }
+  #screen-create .btn-create-final {
+    width: auto;
+    min-width: 240px;
+    padding: 18px 40px;
+  }
+}
+
+/* ── Rooms Search ── */
+.rooms-search-wrap {
+  padding: 0 var(--page-pad) 25px;
+  background: transparent; /* Removed the background bar */
+}
+.rooms-search-inner {
+  width: 100%;
+}
+.search-box {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input); /* Use the solid input background */
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 0 18px;
+  transition: all 0.2s;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+/* Align search bar with lobby grid across breakpoints */
+@media (min-width: 768px) {
+  .rooms-search-inner { padding: 0 40px; }
+}
+@media (min-width: 1024px) {
+  .rooms-search-inner { padding: 0 60px; }
+}
+@media (min-width: 1200px) {
+  .rooms-search-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 80px;
+  }
+}
+.search-box:focus-within {
+  border-color: var(--gold-dim);
+  background: rgba(255,255,255,0.05);
+}
+.search-box svg { flex-shrink: 0; }
+.search-box input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 14px 12px;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 500;
+  outline: none;
+}
+.search-box input::placeholder { color: var(--text-faint); }
+
+.btn-toggle-password {
+  background: none;
+  border: none;
+  padding: 8px;
+  color: var(--text-faint);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+.btn-toggle-password:hover { color: var(--gold); }
+
+.modal-input-wrap {
+  position: relative;
+  width: 100%;
+}
+.password-toggle-wrap .modal-input {
+  padding-right: 48px;
+}
+.password-toggle-wrap .btn-toggle-password {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+}

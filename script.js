@@ -6,7 +6,7 @@
 // ── MULTIPLAYER INITIALIZATION ──────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();   // Connect to Firebase Realtime Database
-  initDottedSurface();
+  initSpeedLinesBackground();
   
   // Listen for all multiplayer rooms globally
   listenToAllRooms(rooms => {
@@ -71,6 +71,113 @@ function changePlayerName() {
 var multiplayerRooms = [];  // local cache (used for rooms list display)
 let createdRoomCode = null;
 let createdRoomData = null;
+
+// ── BACKGROUND — SPEED LINES SHADER ─────────────────────────
+function initSpeedLinesBackground() {
+  const container = document.getElementById('dotted-surface-container');
+  if (!container) return;
+
+  // Cleanup any existing canvas
+  container.innerHTML = '';
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  container.appendChild(renderer.domElement);
+
+  const uniforms = {
+    uTime: { value: 0 },
+    uResolution: { value: new THREE.Vector3(window.innerWidth, window.innerHeight, 1) }
+  };
+
+  const geometry = new THREE.PlaneGeometry(2, 2);
+  const material = new THREE.ShaderMaterial({
+    uniforms: uniforms,
+    vertexShader: `
+      varying vec2 vTexCoord;
+      void main() {
+        vTexCoord = uv;
+        gl_Position = vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform vec3 uResolution;
+      uniform float uTime;
+
+      float randVal(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123); }
+
+      float noise2d(vec2 p){
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          vec2 u = f*f*(3.0-2.0*f);
+          float a = randVal(i + vec2(0.0, 0.0));
+          float b = randVal(i + vec2(1.0, 0.0));
+          float c = randVal(i + vec2(0.0, 1.0));
+          float d = randVal(i + vec2(1.0, 1.0));
+          return (a + (b-a)*u.x + (c-a)*u.y + (a-b-c+d)*u.x*u.y) / 4.0;
+      }
+
+      float mirrored(float t, float shift){
+          t = fract(t + shift);
+          return 2.0*abs(t-0.5);
+      }
+
+      float radialLayer(float angle, float radius){
+          const float SCALE = 45.0;
+          radius = pow(radius, 0.01);
+          float offset = -uTime * 0.07;
+          vec2 pos = vec2(mirrored(angle, 0.1), radius + offset);
+          float n1 = noise2d(pos * SCALE);
+          pos = 2.1*vec2(mirrored(angle,0.4), radius+offset);
+          float n2 = noise2d(pos * SCALE);
+          pos = 3.7*vec2(mirrored(angle,0.8), radius+offset);
+          float n3 = noise2d(pos * SCALE);
+          pos = 5.8*vec2(mirrored(angle,0.0), radius+offset);
+          float n4 = noise2d(pos * SCALE);
+          return pow((n1 + 0.5*n2 + 0.25*n3 + 0.125*n4) * 3.0, 1.0);
+      }
+
+      vec3 applyColor(float v){
+          v = clamp(v, 0.0, 1.0);
+          // Gold Palette - Rich Amber to Bright Gold
+          vec3 col = mix(vec3(0.15, 0.08, 0.0), vec3(0.8, 0.5, 0.1), v);
+          col = mix(col, vec3(1.0, 0.85, 0.4), v*4.0-3.0) * v;
+          col = max(col, vec3(0.0));
+          col = mix(col, vec3(1.0, 0.7, 0.0), smoothstep(1.0, 0.2, v) * smoothstep(0.15, 0.9, v));
+          return col;
+      }
+
+      void main(){
+          vec2 uv = (gl_FragCoord.xy * 2.0 - uResolution.xy) / uResolution.y * 0.5;
+          float dist = dot(uv, uv);
+          float ang = atan(uv.y, uv.x) / 6.28318530718;
+          float val = radialLayer(ang, dist);
+          val = val * 2.5 - 1.4;
+          val = mix(0.0, val, 0.8 * smoothstep(0.0, 0.8, dist));
+          gl_FragColor = vec4(applyColor(val), 1.0);
+      }
+    `
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  scene.add(mesh);
+
+  function animate(time) {
+    requestAnimationFrame(animate);
+    uniforms.uTime.value = time * 0.001;
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    uniforms.uResolution.value.set(window.innerWidth, window.innerHeight, 1);
+  });
+
+  requestAnimationFrame(animate);
+}
 
 // Store room locally AND in Firebase
 function storeMultiplayerRoom(roomData) {
@@ -175,10 +282,19 @@ function confirmLeave() {
 function renderRooms() {
   const list = document.getElementById("roomsList");
   if (!list) return;
+  
+  const searchTerm = (document.getElementById("roomSearchInput")?.value || "").toLowerCase();
   list.innerHTML = "";
 
   // Combine public rooms + multiplayer rooms
-  const allRooms = [...PUBLIC_ROOMS, ...multiplayerRooms];
+  let allRooms = [...PUBLIC_ROOMS, ...multiplayerRooms];
+
+  // Filter by search term
+  if (searchTerm) {
+    allRooms = allRooms.filter(room => 
+      room.name.toLowerCase().includes(searchTerm)
+    );
+  }
 
   allRooms.forEach(room => {
     const isPrivate = room.type === "private";
@@ -214,7 +330,7 @@ function renderRooms() {
         <div class="room-players-count">👥 ${playerCount}</div>
       </div>
       <button class="room-join-btn ${joinClass}" onclick="event.stopPropagation();handleJoinRoom(${JSON.stringify(room).replace(/"/g,'&quot;')})">
-        ${isPrivate || room.type === 'multiplayer' ? 'ENTER' : 'JOIN'}
+        ${isPrivate || room.code ? 'ENTER' : 'JOIN'}
       </button>`;
 
     list.appendChild(card);
@@ -391,7 +507,7 @@ function _paintLobby(room) {
   }));
 
   playerList.forEach((player, i) => {
-    const isHost          = player.name === room.host;
+    const isHost          = player.id   === room.hostId;
     const isCurrentPlayer = player.id   === playerId;
     const initials = (player.name || 'PL').slice(0, 2).toUpperCase();
     const row = document.createElement("div");
@@ -501,6 +617,15 @@ function toggleDropdown(id) {
 function togglePasswordInput(show) {
   const wrap = document.getElementById("password-input-wrap");
   if (wrap) wrap.style.display = show ? "block" : "none";
+}
+
+function togglePasswordVisibility(inputId) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  const type = input.getAttribute("type") === "password" ? "text" : "password";
+  input.setAttribute("type", type);
+  
+  // Optional: Change eye icon if you want to be extra fancy
 }
 
 function selectStake(amount, event) {
@@ -639,7 +764,7 @@ function submitJoinCode() {
       }
       errorEl.textContent = "";
       closeJoinCodeModal();
-      loadRoom(room);
+      handleJoinRoom(room);
     })
     .catch(() => {
       errorEl.textContent = "Network error — please try again.";

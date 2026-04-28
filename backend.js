@@ -269,9 +269,11 @@ function addPlayerToFirebaseRoom(code, playerObj) {
       return roomRef.update({
         players:    updatedPlayers,
         playerList: updatedPlayerList,
+        lastActivity: Date.now()
       }).then(function() {
         room.players    = updatedPlayers;
         room.playerList = updatedPlayerList;
+        room.lastActivity = Date.now();
         resolve(room);
       });
     }).catch(reject);
@@ -284,7 +286,8 @@ function addPlayerToFirebaseRoom(code, playerObj) {
 function startFirebaseRoom(code) {
   if (!db) return Promise.resolve();
   return db.ref("rooms/" + code.toUpperCase()).update({
-    started: true
+    started: true,
+    lastActivity: Date.now()
   });
 }
 
@@ -298,8 +301,28 @@ function listenToAllRooms(onUpdate) {
     var data = snapshot.val() || {};
     var roomsArray = Object.values(data);
     onUpdate(roomsArray);
+    
+    // Automatically trigger a cleanup check when room data changes
+    cleanupExpiredRooms(roomsArray);
   });
   return function() { ref.off("value"); };
+}
+
+/**
+ * Deletes rooms that haven't shown activity for 12 hours.
+ */
+function cleanupExpiredRooms(rooms) {
+  if (!db || !rooms.length) return;
+  var EXPIRY_MS = 12 * 60 * 60 * 1000; // 12 hours
+  var now = Date.now();
+  
+  rooms.forEach(function(room) {
+    var activity = room.lastActivity || room.createdAt || 0;
+    if (now - activity > EXPIRY_MS) {
+      console.log("🧹 Inactivity cleanup: removing room " + room.code);
+      db.ref("rooms/" + room.code.toUpperCase()).remove();
+    }
+  });
 }
 
 /**
@@ -340,6 +363,7 @@ function createMultiplayerRoom(roomName, stake, icon, isPrivate, password) {
     distance:   "1200m",
     password:   isPrivate ? password : null,
     createdAt:  Date.now(),
+    lastActivity: Date.now(),
     started:    false,
   };
 }
