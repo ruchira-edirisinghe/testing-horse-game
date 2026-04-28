@@ -1,639 +1,4 @@
-// ═══════════════════════════════════════════════════════════
-//  SCRIPT.JS — UI Logic, Navigation, Screens
-//  MULTIPLAYER ENABLED — Firebase Integration & Player Management
-// ═══════════════════════════════════════════════════════════
-
-// ── MULTIPLAYER INITIALIZATION ──────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  initFirebase();   // Connect to Firebase Realtime Database
-  initDottedSurface();
-  // Show player name modal on first load
-  setTimeout(() => {
-    document.getElementById('modal-player-name').classList.add('open');
-  }, 500);
-});
-
-// ── PLAYER NAME MODAL HANDLERS ──────────────────────────────
-function submitPlayerName() {
-  const nameInput = document.getElementById('playerNameInput');
-  const playerNameError = document.getElementById('playerNameError');
-  const name = nameInput.value.trim();
-  
-  const validation = validatePlayerName(name);
-  
-  if (!validation.valid) {
-    playerNameError.textContent = validation.reason;
-    nameInput.classList.add('shake');
-    setTimeout(() => nameInput.classList.remove('shake'), 500);
-    return;
-  }
-  
-  setPlayerName(name);
-  playerNameError.textContent = '';
-  
-  // Update UI with player name
-  document.getElementById('playerBadge').style.display = 'flex';
-  document.getElementById('playerNameBadge').textContent = name;
-  const initials = name.slice(0, 2).toUpperCase();
-  document.getElementById('playerAvatar').textContent = initials;
-  
-  // Close modal
-  closePlayerNameModal();
-  
-  // Show home screen
-  showScreen('screen-home');
-}
-
-function closePlayerNameModal() {
-  document.getElementById('modal-player-name').classList.remove('open');
-}
-
-// Allow changing player name
-function changePlayerName() {
-  document.getElementById('playerNameInput').value = '';
-  document.getElementById('playerNameError').textContent = '';
-  document.getElementById('modal-player-name').classList.add('open');
-  document.getElementById('playerNameInput').focus();
-}
-
-// ── MULTIPLAYER ROOM TRACKING ──────────────────────────────
-var multiplayerRooms = [];  // local cache (used for rooms list display)
-let createdRoomCode = null;
-let createdRoomData = null;
-
-// Store room locally AND in Firebase
-function storeMultiplayerRoom(roomData) {
-  multiplayerRooms.push(roomData);
-  return saveRoomToFirebase(roomData);  // returns Promise<code>
-}
-
-// Find room by code — checks local cache first, then Firebase
-function findRoomByCode(code) {
-  return multiplayerRooms.find(r => r.code.toUpperCase() === code.toUpperCase()) || null;
-}
-
-// ── NAVIGATION ───────────────────────────────────────────────
-
-function showScreen(id) {
-  // Detach Firebase lobby listener when navigating away from lobby
-  if (id !== "screen-lobby" && typeof _lobbyUnsubscribe === "function") {
-    _lobbyUnsubscribe();
-    _lobbyUnsubscribe = null;
-  }
-
-  // Hide all
-  document.querySelectorAll(".screen").forEach(s => {
-    s.style.display = "none";
-    s.classList.remove("active");
-  });
-  const target = document.getElementById(id);
-  if (!target) return;
-  target.style.display = "flex";
-  target.classList.add("active");
-
-  // Handle screen-specific initializations
-  if (id === "screen-create") {
-    generatedInviteCode = null;   // always get a fresh code
-    generateInviteCode();
-  }
-  
-  if (id === "screen-rooms") {
-    renderRooms();
-  }
-  
-  // Push to stack (avoid duplicates at top)
-  if (screenStack[screenStack.length - 1] !== id) {
-    screenStack.push(id);
-  }
-}
-
-// Screens that require leave confirmation before navigating away
-const CONFIRM_LEAVE_SCREENS = ["screen-lobby", "screen-game"];
-
-function goBack() {
-  if (screenStack.length <= 1) return;
-
-  // Check if current screen needs a leave confirmation
-  const currentScreen = screenStack[screenStack.length - 1];
-  if (CONFIRM_LEAVE_SCREENS.includes(currentScreen)) {
-    openLeaveModal();
-    return;
-  }
-
-  // Otherwise navigate back immediately
-  performGoBack();
-}
-
-function performGoBack() {
-  if (screenStack.length <= 1) return;
-  screenStack.pop(); // remove current
-  const prev = screenStack[screenStack.length - 1];
-  // Show previous without re-pushing
-  document.querySelectorAll(".screen").forEach(s => {
-    s.style.display = "none";
-    s.classList.remove("active");
-  });
-  const target = document.getElementById(prev);
-  if (target) {
-    target.style.display = "flex";
-    target.classList.add("active");
-  }
-}
-
-// ── LEAVE CONFIRMATION MODAL ─────────────────────────────────
-
-function openLeaveModal() {
-  document.getElementById("modal-leave").classList.add("open");
-}
-
-function closeLeaveModal() {
-  document.getElementById("modal-leave").classList.remove("open");
-}
-
-function handleLeaveBackdrop(e) {
-  if (e.target === document.getElementById("modal-leave")) closeLeaveModal();
-}
-
-function confirmLeave() {
-  closeLeaveModal();
-  performGoBack();
-}
-
-// ── ROOMS LIST ───────────────────────────────────────────────
-
-function renderRooms() {
-  const list = document.getElementById("roomsList");
-  if (!list) return;
-  list.innerHTML = "";
-
-  // Combine public rooms + multiplayer rooms
-  const allRooms = [...PUBLIC_ROOMS, ...multiplayerRooms];
-
-  allRooms.forEach(room => {
-    const isPrivate = room.type === "private";
-    const isRanked  = room.tag === "ranked";
-    const joinClass = isPrivate ? "locked" : isRanked ? "ranked-btn" : "open";
-
-    // Left accent class
-    let cardAccent = "fast-play";
-    if (isRanked)  cardAccent = "ranked";
-    if (isPrivate) cardAccent = "private";
-
-    const card = document.createElement("div");
-    card.className = `room-card ${cardAccent}`;
-    card.onclick = () => handleJoinRoom(room);
-
-    const stakeIcon = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="10" height="10" rx="2" stroke="#6b7399" stroke-width="1"/><path d="M3 5.5h5M5.5 3v5" stroke="#6b7399" stroke-width="1" stroke-linecap="round"/></svg>`;
-
-    const lockIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
-    const gameIcon = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M7 10h2M8 9v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13" cy="10" r="1" fill="currentColor"/></svg>`;
-
-    const playerCount = `${room.players.length} / ${room.maxPlayers}`;
-    
-    card.innerHTML = `
-      <div class="room-icon-wrap" style="color:${isPrivate ? 'var(--text-muted)' : isRanked ? 'var(--gold)' : 'var(--gold-light)'}">
-        ${isPrivate ? lockIcon : gameIcon}
-      </div>
-      <div class="room-info">
-        <div class="room-name">${room.name}</div>
-        <div class="room-meta">
-          <span class="room-stake">${stakeIcon} STAKE: ${room.stake}</span>
-          <span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>
-        </div>
-        <div class="room-players-count">👥 ${playerCount}</div>
-      </div>
-      <button class="room-join-btn ${joinClass}" onclick="event.stopPropagation();handleJoinRoom(${JSON.stringify(room).replace(/"/g,'&quot;')})">
-        ${isPrivate || room.type === 'multiplayer' ? 'ENTER' : 'JOIN'}
-      </button>`;
-
-    list.appendChild(card);
-  });
-
-  // Show "No rooms" message if both lists are empty
-  if (allRooms.length === 0) {
-    list.innerHTML = '<div style="padding: 20px; text-align: center; color: var(--text-muted);">No active arenas. Create one to start!</div>';
-  }
-}
-
-// ── HANDLE JOIN ──────────────────────────────────────────────
-
-let pendingRoom = null;
-
-function handleJoinRoom(room) {
-  if (typeof room === "string") room = JSON.parse(room);
-  pendingRoom = room;
-
-  // If multiplayer room, ask for player name confirmation
-  if (room.code) {
-    loadRoom(pendingRoom);
-  } else {
-    // Public room
-    pendingRoom = PUBLIC_ROOMS.find(r => r.id === room.id) || room;
-    loadRoom(pendingRoom);
-  }
-}
-
-// ── LOADING SCREEN ───────────────────────────────────────────
-
-function loadRoom(room) {
-  activeRoom = room;
-  // Show loading screen without pushing to nav stack (it's transitional)
-  document.querySelectorAll(".screen").forEach(s => {
-    s.style.display = "none";
-    s.classList.remove("active");
-  });
-  const loadingScreen = document.getElementById("screen-loading");
-  loadingScreen.style.display = "flex";
-  loadingScreen.classList.add("active");
-  document.getElementById("loadingLabel").textContent  = "ENTERING THE ARENA…";
-  document.getElementById("loadingRoomName").textContent = room.name;
-  document.getElementById("loadingBarFill").style.width = "0%";
-
-  // Animate progress bar
-  let progress = 0;
-  const messages = [
-    "SADDLING UP THE HORSES…",
-    "CHECKING RACE CONDITIONS…",
-    "SETTING THE TRACK…",
-    "COUNTING JOCKEYS…",
-    "GATES ARE OPENING…",
-  ];
-  let msgIdx = 0;
-
-  const interval = setInterval(() => {
-    progress += Math.random() * 18 + 5;
-    if (progress > 100) progress = 100;
-    document.getElementById("loadingBarFill").style.width = progress + "%";
-
-    if (progress > (msgIdx + 1) * 20 && msgIdx < messages.length - 1) {
-      msgIdx++;
-      document.getElementById("loadingLabel").textContent = messages[msgIdx];
-    }
-
-    if (progress >= 100) {
-      clearInterval(interval);
-      setTimeout(() => renderLobby(room), 400);
-    }
-  }, 180);
-}
-
-// ── LOBBY ────────────────────────────────────────────────────
-
-// Pure render — paints whatever room object it receives
-function _paintLobby(room) {
-  activeRoom = room;
-  const isPrivate     = room.type === "private";
-  const isRanked      = room.tag  === "ranked";
-  const isMultiplayer = !!room.code;
-
-  const lockIcon = `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="10" width="14" height="9" rx="2" stroke="#6b7399" stroke-width="1.5"/><path d="M7 10V8a4 4 0 018 0v2" stroke="#6b7399" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-  const gameIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="3.5" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5"/><path d="M8 12h3M9.5 10.5v3" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5" stroke-linecap="round"/><circle cx="16" cy="12" r="1.5" fill="${isRanked ? '#c9a227' : '#e8be45'}"/></svg>`;
-  const tagBadge    = `<span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>`;
-  const codeDisplay = isMultiplayer ? `<div class="lobby-room-code"><strong>CODE:</strong> ${room.code}</div>` : '';
-
-  document.getElementById("lobbyBanner").innerHTML = `
-    <div class="lobby-room-icon-wrap">${isPrivate ? lockIcon : gameIcon}</div>
-    <div style="flex:1;min-width:0">
-      <div class="lobby-room-title">${room.name}</div>
-      <div class="lobby-room-host">Hosted by <strong style="color:var(--text-primary)">${room.host}</strong></div>
-      <div class="lobby-room-badges" style="margin-top:5px">${tagBadge}</div>
-      ${codeDisplay}
-    </div>
-    <div class="lobby-actions">
-      <button class="btn-lobby-invite" onclick="openInviteModal()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
-        INVITE FRIENDS
-      </button>
-    </div>`;
-
-  document.getElementById("lobbyDetails").innerHTML = `
-    <div class="detail-cell">
-      <div class="detail-label">Track</div>
-      <div class="detail-value">${room.track}</div>
-    </div>
-    <div class="detail-cell">
-      <div class="detail-label">Distance</div>
-      <div class="detail-value teal">${room.distance}</div>
-    </div>
-    <div class="detail-cell">
-      <div class="detail-label">Stake</div>
-      <div class="detail-value gold">${room.stake} 🪙</div>
-    </div>
-    <div class="detail-cell">
-      <div class="detail-label">Capacity</div>
-      <div class="detail-value">${(room.players||[]).length} / ${room.maxPlayers}</div>
-    </div>
-    <div class="detail-cell" style="grid-column:1/-1">
-      <div class="detail-label">Password</div>
-      <div class="detail-value password-cell" style="display:flex;align-items:center;gap:8px;font-size:14px">
-        <span style="color:var(--gold-light)">Open Access</span>
-      </div>
-    </div>`;
-
-  const playersDiv = document.getElementById("lobbyPlayers");
-  playersDiv.innerHTML = "";
-  document.getElementById("lobbyPlayerCount").textContent =
-    (room.players||[]).length + "/" + room.maxPlayers;
-
-  const playerList = room.playerList || (room.players||[]).map((name, i) => ({
-    name, id: "player_" + i, ready: false, joinedAt: Date.now()
-  }));
-
-  playerList.forEach((player, i) => {
-    const isHost          = player.name === room.host;
-    const isCurrentPlayer = player.id   === playerId;
-    const initials = (player.name || 'PL').slice(0, 2).toUpperCase();
-    const row = document.createElement("div");
-    row.className = "player-row";
-    row.style.animationDelay = (i * 80) + "ms";
-    row.innerHTML = `
-      <div class="player-avatar ${isHost ? 'host-avatar' : ''} ${isCurrentPlayer ? 'current-player' : ''}">${initials}</div>
-      <div class="player-name">${player.name}${isCurrentPlayer ? ' <span style="opacity:.6">(You)</span>' : ''}</div>
-      ${isHost ? '<span class="player-host-badge">HOST</span>' : ''}
-      <span class="player-ready-badge">READY</span>`;
-    playersDiv.appendChild(row);
-  });
-
-  document.getElementById("lobbyStakeNote").innerHTML =
-    `Entry stake: <span>${room.stake} credits</span> will be deducted on race start`;
-
-  // Only show the START button to the host
-  const startBtn = document.querySelector(".btn-start");
-  if (startBtn) {
-    const isRoomHost = (room.hostId === playerId) || (!isMultiplayer && playerName === room.host);
-    startBtn.style.display = isRoomHost ? "flex" : "none";
-  }
-}
-
-function renderLobby(room) {
-  // If this is a multiplayer room, add this player to Firebase first,
-  // then subscribe to live updates so the lobby reflects everyone's presence.
-  if (room.code) {
-    const myPlayerObj = { id: playerId, name: playerName, ready: false, joinedAt: Date.now() };
-    const isAlreadyIn = (room.playerList || []).find(p => p.id === playerId);
-
-    const enterAndListen = (latestRoom) => {
-      _paintLobby(latestRoom);
-
-      // Only switch screen once
-      const lobbyEl = document.getElementById("screen-lobby");
-      if (!lobbyEl.classList.contains("active")) {
-        showScreen("screen-lobby");
-      }
-
-      // Subscribe to live changes (new players joining, etc.)
-      if (typeof _lobbyUnsubscribe === "function") _lobbyUnsubscribe();
-      _lobbyUnsubscribe = listenToRoom(latestRoom.code, updatedRoom => {
-        // If the host has started the race, pull everyone else in!
-        if (updatedRoom.started && !gameRacing) {
-          startRaceFromLobby(true); 
-        } else {
-          _paintLobby(updatedRoom);
-        }
-      });
-    };
-
-    if (isAlreadyIn) {
-      // Host — already in the room, just subscribe
-      enterAndListen(room);
-    } else {
-      // Joiner — write to Firebase then subscribe
-      addPlayerToFirebaseRoom(room.code, myPlayerObj)
-        .then(updatedRoom => enterAndListen(updatedRoom || room))
-        .catch(() => enterAndListen(room));  // fallback on error
-    }
-  } else {
-    // Public room (no Firebase)
-    _paintLobby(room);
-    showScreen("screen-lobby");
-  }
-}
-
-// ── START RACE FROM LOBBY ────────────────────────────────────
-
-function startRaceFromLobby(force) {
-  if (!activeRoom) return;
-  // Deduct stake
-  if (balance < activeRoom.stake) {
-    if (!force) alert("Insufficient credits to enter this arena!");
-    return;
-  }
-  
-  // Only host can start (unless forced by Firebase update)
-  if (!force && playerName !== activeRoom.host) {
-    alert("Only the host can start the race!");
-    return;
-  }
-
-  // If host is starting a multiplayer room, update Firebase so others join
-  if (!force && activeRoom.code && playerName === activeRoom.host) {
-    startFirebaseRoom(activeRoom.code);
-  }
-
-  // Transition to game
-  balance -= activeRoom.stake;
-  // Jump to game (existing race page)
-  showRaceGame();
-}
-
-// ── CREATE ROOM HANDLERS ─────────────────────────────────────
-
-let selectedStake = 50;
-let selectedIcon = "🎮";
-let generatedInviteCode = null;
-
-function toggleDropdown(id) {
-  const dropdown = document.getElementById(id);
-  dropdown.style.display = dropdown.style.display === "none" ? "block" : "none";
-}
-
-function selectStake(amount, event) {
-  event.stopPropagation();
-  selectedStake = amount;
-  document.getElementById("selected-stake").textContent = amount + " CREDITS 🪙";
-  document.getElementById("stake-options").style.display = "none";
-}
-
-function selectIcon(icon, event) {
-  event.stopPropagation();
-  selectedIcon = icon;
-  document.getElementById("selected-icon").textContent = icon;
-  document.getElementById("icon-options").style.display = "none";
-}
-
-function generateInviteCode() {
-  // Always fresh — calls backend helper (not itself)
-  generatedInviteCode = generateInviteCodeString(8);
-  updateInviteCodeDisplay();
-}
-
-function updateInviteCodeDisplay() {
-  if (generatedInviteCode) {
-    document.getElementById("invite-code-val").value = generatedInviteCode;
-    document.getElementById("inviteCodeRow").style.opacity = "1";
-    document.querySelector(".btn-icon-copy").disabled = false;
-    document.getElementById("shareInviteBtn").disabled = false;
-  }
-}
-
-function handleCreateRoom() {
-  const roomName = document.getElementById("create-room-name").value.trim();
-
-  if (!roomName) { alert("Please enter a room name!"); return; }
-  if (!playerName) { alert("Please set your player name first!"); return; }
-
-  // Use the code already shown on screen
-  const roomCode = generatedInviteCode || generateInviteCodeString(8);
-
-  // Build room object
-  const newRoom = createMultiplayerRoom(roomName, selectedStake, selectedIcon);
-  newRoom.code  = roomCode;
-
-  // Disable button to prevent double-submit
-  const createBtn = document.querySelector(".btn-create-final");
-  if (createBtn) { createBtn.disabled = true; createBtn.textContent = "CREATING…"; }
-
-  // Save to Firebase (or locally if Firebase not configured), then enter lobby
-  storeMultiplayerRoom(newRoom)
-    .then(() => {
-      createdRoomCode = newRoom.code;
-      createdRoomData = newRoom;
-      document.getElementById("create-room-name").value = "";
-      selectedStake = 50;
-      selectedIcon  = "🎮";
-      generatedInviteCode = null;
-      if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
-      loadRoom(newRoom);
-    })
-    .catch(() => {
-      // saveRoomToFirebase always resolves, so this is just a safety net
-      if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = '+ CREATE ROOM'; }
-      loadRoom(newRoom);
-    });
-}
-
-function copyInviteCode() {
-  const code = document.getElementById("invite-code-val").value;
-  navigator.clipboard.writeText(code).then(() => {
-    const btn = event.target.closest('button');
-    const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    setTimeout(() => {
-      btn.innerHTML = originalHTML;
-    }, 2000);
-  });
-}
-
-function shareInviteLink() {
-  const code = document.getElementById("invite-code-val").value;
-  const link = `${window.location.origin}?invite=${code}`;
-  
-  if (navigator.share) {
-    navigator.share({
-      title: 'Join Horse Racing Elite!',
-      text: `Join my arena with code: ${code}`,
-      url: link
-    });
-  } else {
-    navigator.clipboard.writeText(link).then(() => {
-      alert("Invite link copied to clipboard!");
-    });
-  }
-}
-
-// ── JOIN BY CODE HANDLERS ────────────────────────────────────
-
-function openJoinCodeModal() {
-  document.getElementById("modal-join-code").classList.add("open");
-  document.getElementById("joinCodeInput").focus();
-  document.getElementById("joinCodeError").textContent = "";
-}
-
-function closeJoinCodeModal() {
-  document.getElementById("modal-join-code").classList.remove("open");
-}
-
-function handleJoinCodeBackdrop(e) {
-  if (e.target === document.getElementById("modal-join-code")) closeJoinCodeModal();
-}
-
-function submitJoinCode() {
-  const code = document.getElementById("joinCodeInput").value.trim().toUpperCase();
-  const errorEl = document.getElementById("joinCodeError");
-
-  if (!code) { errorEl.textContent = "Please enter an invite code."; return; }
-
-  errorEl.textContent = "Searching…";
-
-  // Always look up in Firebase so rooms from other browsers/devices are found
-  fetchRoomFromFirebase(code)
-    .then(room => {
-      if (!room) {
-        errorEl.textContent = "Invalid code. Arena not found.";
-        document.getElementById("joinCodeInput").classList.add("shake");
-        setTimeout(() => document.getElementById("joinCodeInput").classList.remove("shake"), 500);
-        return;
-      }
-      if ((room.players || []).length >= room.maxPlayers) {
-        errorEl.textContent = "This arena is full!";
-        return;
-      }
-      errorEl.textContent = "";
-      closeJoinCodeModal();
-      loadRoom(room);
-    })
-    .catch(() => {
-      errorEl.textContent = "Network error — please try again.";
-    });
-}
-
-// ── INVITE MODAL ─────────────────────────────────────────────
-
-function openInviteModal() {
-  if (activeRoom && activeRoom.code) {
-    document.getElementById("lobby-invite-code-val").value = activeRoom.code;
-  }
-  document.getElementById("modal-invite").classList.add("open");
-}
-
-function closeInviteModal() {
-  document.getElementById("modal-invite").classList.remove("open");
-}
-
-function handleInviteBackdrop(e) {
-  if (e.target === document.getElementById("modal-invite")) closeInviteModal();
-}
-
-function copyLobbyInviteCode() {
-  const code = document.getElementById("lobby-invite-code-val").value;
-  navigator.clipboard.writeText(code).then(() => {
-    const btn = event.target.closest('button');
-    const originalHTML = btn.innerHTML;
-    btn.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>';
-    setTimeout(() => {
-      btn.innerHTML = originalHTML;
-    }, 2000);
-  });
-}
-
-function shareLobbyInviteLink() {
-  const code = document.getElementById("lobby-invite-code-val").value;
-  const link = `${window.location.origin}?invite=${code}`;
-  
-  if (navigator.share) {
-    navigator.share({
-      title: 'Join Horse Racing Elite!',
-      text: `Join my arena with code: ${code}`,
-      url: link
-    });
-  } else {
-    navigator.clipboard.writeText(link).then(() => {
-      alert("Invite link copied to clipboard!");
-    });
-  }
-}
-
-// ── RACE GAME (existing engine) ──────────────────────────────
+﻿// â”€â”€ RACE GAME (existing engine) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // This section re-uses the original casino game on a dynamic screen.
 // The race screen is injected into the DOM at runtime.
 
@@ -681,7 +46,7 @@ function buildRaceScreenHTML() {
     </button>
     <img src="assets/logo-horizontal.png" alt="Horse Racing Elite" class="logo-horizontal"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
-    <div class="hlogo-fallback" style="display:none">🏇 ELITE</div>
+    <div class="hlogo-fallback" style="display:none">ðŸ‡ ELITE</div>
     <div class="credits-badge">
       <span class="credits-num" id="gameBalanceDisplay">0</span>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -699,11 +64,11 @@ function buildRaceScreenHTML() {
     </div>
     <div class="race-info-cell" id="gameRoomNameCell">
       <span class="ric-label">ROOM</span>
-      <span class="ric-val" id="gameRoomName" style="color:var(--gold)">—</span>
+      <span class="ric-val" id="gameRoomName" style="color:var(--gold)">â€”</span>
     </div>
     <div class="race-info-cell">
       <span class="ric-label">ENTRY STAKE</span>
-      <span class="ric-val" id="gameStake" style="color:var(--gold-light)">—</span>
+      <span class="ric-val" id="gameStake" style="color:var(--gold-light)">â€”</span>
     </div>
   </div>
 
@@ -713,11 +78,11 @@ function buildRaceScreenHTML() {
       <!-- LEFT COLUMN: Track + Horse Cards -->
       <div class="game-col-left">
         <div class="game-track-area">
-          <div class="game-track-labels"><span>🏁 START</span><span>FINISH 🏁</span></div>
+          <div class="game-track-labels"><span>ðŸ START</span><span>FINISH ðŸ</span></div>
           <div class="game-track">
             <div class="game-start-line"></div>
             <div class="game-finish-line"></div>
-            <div class="game-finish-flag">🏁</div>
+            <div class="game-finish-flag">ðŸ</div>
             <div class="game-track-inner" id="gameTrackInner"></div>
           </div>
           
@@ -730,7 +95,7 @@ function buildRaceScreenHTML() {
 
         <div class="game-section">
           <div class="game-section-header">
-            <span class="game-section-title">🐎  PICK YOUR HORSE</span>
+            <span class="game-section-title">ðŸŽ  PICK YOUR HORSE</span>
             <span class="game-section-hint" id="gameRaceStatus">Tap a card to select</span>
           </div>
           <div class="game-cards-grid" id="gameBettingPanel"></div>
@@ -738,9 +103,9 @@ function buildRaceScreenHTML() {
 
         <div class="game-payout-preview" id="gamePayoutPreview" style="display:none">
           <div class="gpp-row">
-            <span class="gpp-item"><span class="gpp-label">Horse</span><span class="gpp-val" id="gpvHorse">—</span></span>
-            <span class="gpp-item"><span class="gpp-label">Odds</span><span class="gpp-val" id="gpvOdds">—</span></span>
-            <span class="gpp-item"><span class="gpp-label">Potential Win</span><span class="gpp-val gpp-win" id="gpvWin">—</span></span>
+            <span class="gpp-item"><span class="gpp-label">Horse</span><span class="gpp-val" id="gpvHorse">â€”</span></span>
+            <span class="gpp-item"><span class="gpp-label">Odds</span><span class="gpp-val" id="gpvOdds">â€”</span></span>
+            <span class="gpp-item"><span class="gpp-label">Potential Win</span><span class="gpp-val gpp-win" id="gpvWin">â€”</span></span>
           </div>
         </div>
       </div>
@@ -767,7 +132,7 @@ function buildRaceScreenHTML() {
             </div>
           </div>
           <div class="howto-tip">
-            <span>💡</span> <em>Lower odds = more likely to win, less payout. High odds = high risk, high reward!</em>
+            <span>ðŸ’¡</span> <em>Lower odds = more likely to win, less payout. High odds = high risk, high reward!</em>
           </div>
         </div>
 
@@ -776,7 +141,7 @@ function buildRaceScreenHTML() {
           <div class="game-bet-module" id="gameBetModule">
             <div class="game-bet-controls">
               <div class="game-bet-input-wrap">
-                <span class="game-bet-currency">🪙</span>
+                <span class="game-bet-currency">ðŸª™</span>
                 <input class="game-bet-input" id="gameBetAmount" type="number" value="50" min="10" step="10" oninput="gameUpdatePreview()"/>
               </div>
               <button class="game-race-btn" id="gameRaceBtn" onclick="gameStartRace()" disabled>
@@ -805,7 +170,7 @@ function buildRaceScreenHTML() {
 
         <div class="game-side-panel">
           <div class="ghs-header-row">
-            <div class="ghs-label">🏇  LIVE BETS</div>
+            <div class="ghs-label">ðŸ‡  LIVE BETS</div>
           </div>
           <div class="game-live-bets" id="gameLiveBetsList">
             <span class="ghs-empty">Waiting for wagers...</span>
@@ -814,11 +179,11 @@ function buildRaceScreenHTML() {
 
         <div class="game-history-strip">
           <div class="ghs-header-row">
-            <div class="ghs-label">📜  RACE LOG</div>
+            <div class="ghs-label">ðŸ“œ  RACE LOG</div>
             <button class="ghs-clear-btn" onclick="gameClearHistory()">Clear</button>
           </div>
           <div class="ghs-list" id="gameHistoryList">
-            <span class="ghs-empty">No races yet — place your first bet!</span>
+            <span class="ghs-empty">No races yet â€” place your first bet!</span>
           </div>
         </div>
       </div>
@@ -827,11 +192,11 @@ function buildRaceScreenHTML() {
   </div>`;
 }
 
-// ── CSS INJECTION for race screen ────────────────────────────
+// â”€â”€ CSS INJECTION for race screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 (function injectRaceCSS() {
   const s = document.createElement("style");
   s.textContent = `
-  /* ── Race Info Strip ── */
+  /* â”€â”€ Race Info Strip â”€â”€ */
   .race-info-strip{display:grid;grid-template-columns:repeat(2,1fr);background:var(--bg-2);border-bottom:1px solid var(--border);flex-shrink:0}
   .race-info-cell{padding:12px 10px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);text-align:center}
   .race-info-cell:nth-child(even){border-right:none}
@@ -839,16 +204,16 @@ function buildRaceScreenHTML() {
   .ric-label{font-family:var(--font-ui);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--text-faint);display:block;margin-bottom:1px}
   .ric-val{font-family:var(--font-ui);font-size:13px;font-weight:700;color:var(--text-primary);display:block}
 
-  /* ── Scrollable Game Content ── */
+  /* â”€â”€ Scrollable Game Content â”€â”€ */
   .game-scroll-area{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:180px;display:flex;flex-direction:column;min-height:0}
   .game-scroll-area::-webkit-scrollbar{width:4px}
   .game-scroll-area::-webkit-scrollbar-thumb{background:var(--bg-3);border-radius:4px}
 
-  /* ── Instruction Banner ── */
+  /* â”€â”€ Instruction Banner â”€â”€ */
   .game-instruction{display:flex;align-items:center;gap:10px;padding:12px 20px;background:rgba(201,162,39,0.06);border-bottom:1px solid rgba(201,162,39,0.15);color:var(--gold);font-family:var(--font-ui);font-size:13px;font-weight:600;letter-spacing:0.3px;flex-shrink:0}
   .game-instruction svg{flex-shrink:0;color:var(--gold)}
 
-  /* ── Track Area ── */
+  /* â”€â”€ Track Area â”€â”€ */
   .game-track-area{padding:16px 20px 12px;background:linear-gradient(180deg,#0d200d 0%,#1a4a1a 100%);flex-shrink:0}
   .game-track-labels{display:flex;justify-content:space-between;padding:0 30px;margin-bottom:6px;font-family:var(--font-ui);font-size:11px;letter-spacing:1.5px;color:rgba(255,255,255,0.4);text-transform:uppercase}
   .game-track{background:#c8a96e;border-radius:50px;padding:8px 0;border:4px solid #8b6914;position:relative;box-shadow:inset 0 3px 10px rgba(0,0,0,0.4)}
@@ -863,7 +228,7 @@ function buildRaceScreenHTML() {
   .game-crown{display:none;position:absolute;top:-10px;left:50%;transform:translateX(-50%);font-size:16px;animation:crownPop 0.4s ease}
   @keyframes crownPop{0%{transform:translateX(-50%) scale(0)}70%{transform:translateX(-50%) scale(1.3)}100%{transform:translateX(-50%) scale(1)}}
 
-  /* ── Section Headers ── */
+  /* â”€â”€ Section Headers â”€â”€ */
   .game-section{padding:12px 20px 24px}
   .game-section-header{display:flex;align-items:center;justify-content:space-between;padding:16px 0 10px;border-bottom:1px solid var(--border);margin-bottom:12px}
   .game-section-title{font-family:var(--font-display);font-size:18px;letter-spacing:2px;color:var(--text-primary)}
@@ -871,13 +236,13 @@ function buildRaceScreenHTML() {
   .game-section-hint.pulse{animation:gpulse 0.8s ease infinite alternate}
   @keyframes gpulse{from{box-shadow:none;color:var(--text-muted)}to{color:var(--gold);text-shadow:0 0 8px rgba(201,162,39,0.4)}}
 
-  /* ── Horse Cards Grid ── */
+  /* â”€â”€ Horse Cards Grid â”€â”€ */
   .game-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 0 16px}
   .game-horse-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden}
   .game-horse-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-color,var(--gold-dim));opacity:0.6}
   .game-horse-card:hover{border-color:var(--gold-dim);background:var(--bg-card-2);transform:translateY(-2px)}
   .game-horse-card.selected{border-color:var(--gold);background:rgba(201,162,39,0.06);box-shadow:0 0 20px rgba(201,162,39,0.15)}
-  .game-horse-card.selected::after{content:'✓ SELECTED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px}
+  .game-horse-card.selected::after{content:'âœ“ SELECTED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px}
   .game-horse-card.winner{border-color:#00ff88;background:#002215;animation:gwinner 1s ease infinite alternate}
   @keyframes gwinner{from{box-shadow:0 0 6px rgba(0,255,136,0.2)}to{box-shadow:0 0 20px rgba(0,255,136,0.5)}}
 
@@ -895,7 +260,7 @@ function buildRaceScreenHTML() {
   .ghc-strack{flex:1;height:5px;background:var(--bg-3);border-radius:3px;overflow:hidden}
   .ghc-sfill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold-dim),var(--gold-light))}
 
-  /* ── Payout Preview ── */
+  /* â”€â”€ Payout Preview â”€â”€ */
   .game-payout-preview{background:rgba(201,162,39,0.05);border:1px solid var(--border-gold);border-radius:10px;padding:14px 20px;margin:0 20px 12px;display:none;flex-shrink:0}
   .gpp-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap;justify-content:center}
   .gpp-item{display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -903,7 +268,7 @@ function buildRaceScreenHTML() {
   .gpp-val{font-family:var(--font-ui);font-size:15px;font-weight:700;color:var(--text-primary)}
   .gpp-val.gpp-win{color:var(--gold-light);font-size:16px}
 
-  /* ── Result Banner ── */
+  /* â”€â”€ Result Banner â”€â”€ */
   .game-result-banner{margin:0;padding:16px;border-radius:0;text-align:center;animation:gbannerIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);flex-direction:column;align-items:center;gap:8px;display:none;flex-shrink:0;width:100%;background:var(--bg-2)}
   @keyframes gbannerIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
   .game-result-banner.win{background:linear-gradient(180deg,#0a2e0a,#141720);border-top:2px solid #00ff88}
@@ -938,19 +303,19 @@ function buildRaceScreenHTML() {
   }
   .game-track-overlay{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:120px;font-weight:900;color:var(--gold);text-shadow:0 0 40px rgba(201,162,39,0.4);pointer-events:none;z-index:100;opacity:0;transition:all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)}
   .game-track-overlay.show{opacity:1;transform:scale(1.2)}
-  /* ── Header Countdown Pulse ── */
+  /* â”€â”€ Header Countdown Pulse â”€â”€ */
   #gameHeaderTimerVal { animation: ghcpulse 1s infinite alternate }
   @keyframes ghcpulse { from { transform: scale(1); opacity: 0.8 } to { transform: scale(1.15); opacity: 1 } }
 
-  /* ── Timer Badge ── */
+  /* â”€â”€ Timer Badge â”€â”€ */
   .game-timer-badge{background:rgba(201,162,39,0.15);border:1px solid var(--gold);border-radius:20px;padding:2px 10px;font-family:var(--font-display);font-size:13px;font-weight:700;color:var(--gold);margin-left:auto;letter-spacing:1px}
   .game-timer-badge.warning{color:#ff4444;border-color:#ff4444;animation:gtwarn 0.5s infinite alternate}
   @keyframes gtwarn{from{opacity:1}to{opacity:0.5}}
 
-  /* ── Live Bet Statuses ── */
+  /* â”€â”€ Live Bet Statuses â”€â”€ */
   .game-live-bet-card.waiting{opacity:0.6;filter:grayscale(0.5)}
   .game-live-bet-card.ready{border-color:rgba(201,162,39,0.4);background:rgba(201,162,39,0.03)}
-  /* ── Race Log Report Table ── */
+  /* â”€â”€ Race Log Report Table â”€â”€ */
   .game-history-report{width:100%;border-collapse:collapse;margin-top:5px;font-size:12px}
   .game-history-report th{text-align:left;color:rgba(255,255,255,0.4);font-weight:600;padding:6px 4px;border-bottom:1px solid rgba(255,255,255,0.05);text-transform:uppercase;letter-spacing:0.5px;font-size:10px}
   .game-history-report td{padding:8px 4px;border-bottom:1px solid rgba(255,255,255,0.03);color:rgba(255,255,255,0.8)}
@@ -993,7 +358,7 @@ function buildRaceScreenHTML() {
   .ghs-detail-row.won span:last-child{color:#00ff88;font-weight:700}
   .ghs-detail-row.lost span:last-child{color:#ff8888;opacity:0.8}
 
-  /* ── Bet Bar (mobile: fixed bottom) ── */
+  /* â”€â”€ Bet Bar (mobile: fixed bottom) â”€â”€ */
   .game-bet-bar{position:fixed;bottom:0;left:0;right:0;z-index:50;display:flex;align-items:center;justify-content:center;padding:12px 14px 20px;background:rgba(20,23,32,0.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid rgba(201,162,39,0.25);box-shadow:0 -10px 40px rgba(0,0,0,0.6)}
   .game-bet-controls{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;flex-wrap:wrap}
   .game-bet-controls{display:flex;align-items:center;gap:10px;flex:1;flex-wrap:wrap}
@@ -1007,7 +372,7 @@ function buildRaceScreenHTML() {
   .game-qbtn:hover{border-color:var(--gold-dim);color:var(--gold);background:rgba(201,162,39,0.1)}
   .game-qbtn-allin{color:var(--gold);border-color:rgba(201,162,39,0.3)}
 
-  /* ── Race Button ── */
+  /* â”€â”€ Race Button â”€â”€ */
   .game-race-btn{display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,var(--gold-dim),var(--gold),var(--gold-light));background-size:200% 200%;animation:goldShimmer 3s ease infinite;border:none;border-radius:10px;color:#0a0e18;font-family:var(--font-display);font-size:16px;letter-spacing:1px;padding:0 20px;cursor:pointer;transition:all 0.2s;height:44px;font-weight:800;text-transform:uppercase}
   .game-race-btn:hover{box-shadow:0 8px 36px rgba(201,162,39,0.5);transform:translateY(-1px) scale(1.01)}
   .game-race-btn:active{transform:scale(0.98)}
@@ -1016,12 +381,12 @@ function buildRaceScreenHTML() {
   input.shake{animation:inputShake 0.4s ease}
   @keyframes inputShake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
 
-  /* ── Two-Column Layout (base: single column) ── */
+  /* â”€â”€ Two-Column Layout (base: single column) â”€â”€ */
   .game-main-layout{display:flex;flex-direction:column;gap:0}
   .game-col-left{flex:1;min-width:0}
   .game-col-right{display:flex;flex-direction:column;gap:0}
 
-  /* ── How to Play Panel ── */
+  /* â”€â”€ How to Play Panel â”€â”€ */
   .game-howto-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:16px}
   .howto-title{font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--text-primary);display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
   .howto-steps{display:flex;flex-direction:column;gap:12px}
@@ -1032,7 +397,7 @@ function buildRaceScreenHTML() {
   .howto-tip{margin-top:14px;padding:10px 12px;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.15);border-radius:8px;font-family:var(--font-body);font-size:11px;color:var(--gold);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
   .howto-tip em{color:var(--text-muted)}
 
-  /* ── Tablet ── */
+  /* â”€â”€ Tablet â”€â”€ */
   @media(min-width:768px){
     .game-cards-grid{grid-template-columns:repeat(3,1fr);gap:12px}
     .game-section{padding:0 20px}
@@ -1051,7 +416,7 @@ function buildRaceScreenHTML() {
     .grb-money{font-size:32px}
   }
 
-  /* ── Desktop: two-column, viewport-fit, no scroll ── */
+  /* â”€â”€ Desktop: two-column, viewport-fit, no scroll â”€â”€ */
   @media(min-width:900px){
     #screen-game{height:100vh;overflow:hidden}
     .game-scroll-area{overflow:hidden;padding-bottom:0}
@@ -1098,7 +463,7 @@ function buildRaceScreenHTML() {
     .game-result-banner{margin:8px 16px;padding:14px 18px}
   }
 
-  /* ── Large Desktop ── */
+  /* â”€â”€ Large Desktop â”€â”€ */
   @media(min-width:1200px){
     .game-col-right{min-width:380px;flex:0.75}
     .game-col-left{flex:1.25}
@@ -1129,7 +494,7 @@ function buildRaceScreenHTML() {
   document.head.appendChild(s);
 })();
 
-// ── RACE GAME ENGINE ─────────────────────────────────────────
+// â”€â”€ RACE GAME ENGINE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 let gameSelectedHorse = -1;
 let gameRacing        = false;
@@ -1152,7 +517,7 @@ function initRaceGame() {
   if (instr) instr.style.display = "flex";
   if (activeRoom) {
     document.getElementById("gameRoomName").textContent = activeRoom.name;
-    document.getElementById("gameStake").textContent    = activeRoom.stake + " 🪙";
+    document.getElementById("gameStake").textContent    = activeRoom.stake + " ðŸª™";
   }
   document.getElementById("gameRaceNum").textContent = "Race #" + (raceCount + 1);
 
@@ -1247,7 +612,7 @@ function buildGameTrack() {
     const crown = document.createElement("div");
     crown.className = "game-crown";
     crown.id = "gcrown" + i;
-    crown.textContent = "👑";
+    crown.textContent = "ðŸ‘‘";
     wrap.appendChild(crown);
 
     wrap.style.left = TRACK_START + "%";
@@ -1273,7 +638,7 @@ function buildGameBettingPanel() {
       <div class="ghc-header"><div class="ghc-dot" style="background:${h.color}"></div><div class="ghc-name">#${i+1} ${h.name}</div></div>
       <div class="ghc-odds">${h.odds.toFixed(1)}x</div>
       <div class="ghc-odds-label">ODDS TO WIN</div>
-      <div class="ghc-jockey">🧑 ${h.jockey}</div>
+      <div class="ghc-jockey">ðŸ§‘ ${h.jockey}</div>
       <div class="ghc-form">${formBadges}</div>
       <div class="ghc-stat"><div class="ghc-slabel">Spd</div><div class="ghc-strack"><div class="ghc-sfill" style="width:${h.speed}%"></div></div><span style="font-size:9px;color:#446644;width:20px;text-align:right">${h.speed}</span></div>
       <div class="ghc-stat"><div class="ghc-slabel">Stm</div><div class="ghc-strack"><div class="ghc-sfill" style="width:${h.stamina}%;background:linear-gradient(90deg,#1a6a4a,#00ccff)"></div></div><span style="font-size:9px;color:#446644;width:20px;text-align:right">${h.stamina}</span></div>`;
@@ -1378,7 +743,7 @@ function executeRace(betAmt) {
   const instr = document.getElementById("gameInstructionOverlay");
   if (instr) instr.style.display = "none";
   document.getElementById("gameRaceStatus").classList.add("pulse");
-  document.getElementById("gameRaceStatus").textContent = "🏇 Race in progress...";
+  document.getElementById("gameRaceStatus").textContent = "ðŸ‡ Race in progress...";
   document.getElementById("gameRaceNum").textContent = "Race #" + raceCount;
   gameUpdateBalance();
   gamePhase = "racing";
@@ -1460,14 +825,14 @@ function gameEndRace(winner, betAmt) {
     const { gross, profit } = calcPayout(winner, betAmt);
     balance += gross;
     banner.className = "game-result-banner win";
-    document.getElementById("gameResultTitle").textContent = "🏆 WINNER! #" + (winner+1) + " " + horses[winner].name;
+    document.getElementById("gameResultTitle").textContent = "ðŸ† WINNER! #" + (winner+1) + " " + horses[winner].name;
     document.getElementById("gameResultSub").textContent   = "Your horse dominated the field!";
     document.getElementById("gameResultMoney").className   = "grb-money win";
     document.getElementById("gameResultMoney").textContent = "+$" + gross + " (net +$" + profit + ")";
     recordResult(horses[winner], true, profit, betAmt, allResults);
   } else {
     banner.className = "game-result-banner lose";
-    document.getElementById("gameResultTitle").textContent = "😔 #" + (winner+1) + " " + horses[winner].name + " wins!";
+    document.getElementById("gameResultTitle").textContent = "ðŸ˜” #" + (winner+1) + " " + horses[winner].name + " wins!";
     document.getElementById("gameResultSub").textContent   = "Better luck in the next race!";
     document.getElementById("gameResultMoney").className   = "grb-money lose";
     document.getElementById("gameResultMoney").textContent = "-$" + betAmt;
@@ -1517,7 +882,7 @@ function gameRenderLiveBets() {
             ${b.player}
           </div>
           <div class="glb-info">
-            <span class="glb-status ready">Bid Ready ✓</span>
+            <span class="glb-status ready">Bid Ready âœ“</span>
           </div>
         </div>
       `;
@@ -1539,6 +904,51 @@ function gameRenderLiveBets() {
   }).join("");
 }
 
+function gameRenderHistory() {
+  const list = document.getElementById("gameHistoryList");
+  if (!list) return;
+  list.innerHTML = "";
+  if (history.length === 0) {
+    list.innerHTML = `<span class="ghs-empty">No races yet â€” place your first bet!</span>`;
+    return;
+  }
+
+  history.forEach(h => {
+    const pill = document.createElement("div");
+    pill.className = "ghs-pill " + (h.won ? "w" : "l");
+    
+    // Summary of other winners
+    const aiWinners = h.allBets.filter(b => b.won);
+    const winInfo = aiWinners.length > 0 
+      ? `<span class="ghs-extra-info"> +${aiWinners.length} others won</span>`
+      : "";
+
+    pill.innerHTML = `
+      <div class="ghs-row-main">
+        <div class="ghs-dot" style="background:${h.horse.color}"></div>
+        <div class="ghs-side">
+          <div class="ghs-main-text">${h.won ? "WON" : "LOST"} $${Math.abs(h.net)}</div>
+          <div class="ghs-sub-text">#${h.horse.name} ${winInfo}</div>
+        </div>
+      </div>
+    `;
+
+    // Tooltip or detailed view for payouts
+    if (h.allBets.length > 0) {
+      const details = document.createElement("div");
+      details.className = "ghs-details-payouts";
+      details.innerHTML = h.allBets.map(b => `
+        <div class="ghs-detail-row ${b.won ? "won" : "lost"}">
+          <span>${b.player}</span>
+          <span>${b.won ? "+" : ""}$${b.payout}</span>
+        </div>
+      `).join("");
+      pill.appendChild(details);
+    }
+
+    list.appendChild(pill);
+  });
+}
 
 function gameResetForNextRace() {
   const banner = document.getElementById("gameResultBanner");
@@ -1601,7 +1011,7 @@ function gameRenderHistory() {
   `;
 }
 
-// ── SVG HORSE BUILDER ────────────────────────────────────────
+// â”€â”€ SVG HORSE BUILDER â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function buildHorseSVG(color, idx) {
   const dark = darken(color);
   return `<svg viewBox="0 0 72 40" xmlns="http://www.w3.org/2000/svg" width="58" height="34" style="display:block">
@@ -1624,21 +1034,3 @@ function buildHorseSVG(color, idx) {
     <rect id="l3-${idx}" x="45" y="30" width="5" height="9" rx="2" fill="${dark}"/>
   </svg>`;
 }
-
-// ── CHECK FOR INVITE CODE IN URL ─────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  const params = new URLSearchParams(window.location.search);
-  const inviteCode = params.get('invite');
-  
-  if (inviteCode) {
-    setTimeout(() => {
-      // Once player name is set, automatically join via code
-      if (playerName) {
-        const foundRoom = findRoomByCode(inviteCode);
-        if (foundRoom) {
-          loadRoom(foundRoom);
-        }
-      }
-    }, 1000);
-  }
-});

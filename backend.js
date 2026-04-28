@@ -279,6 +279,16 @@ function addPlayerToFirebaseRoom(code, playerObj) {
 }
 
 /**
+ * Mark a room as started in Firebase.
+ */
+function startFirebaseRoom(code) {
+  if (!db) return Promise.resolve();
+  return db.ref("rooms/" + code.toUpperCase()).update({
+    started: true
+  });
+}
+
+/**
  * Subscribe to live updates for a room.
  * onUpdate(room) is called every time Firebase data changes.
  * Returns an unsubscribe function — call it when leaving the lobby.
@@ -308,10 +318,12 @@ function createMultiplayerRoom(roomName, stake, icon) {
     tagLabel:   "⚡ FAST PLAY",
     stake:      stake,
     players:    [playerName],
-    playerList: [{ id: playerId, name: playerName, ready: false, joinedAt: Date.now() }],
+    playerList: [
+      { id: playerId, name: playerName, ready: false, joinedAt: Date.now() }
+    ],
     maxPlayers: 8,
-    track:      "Dynamic Track",
-    distance:   "2000m",
+    track:      "Thunder Downs",
+    distance:   "1200m",
     password:   null,
     createdAt:  Date.now(),
     started:    false,
