@@ -193,8 +193,8 @@ function findRoomByCode(code) {
 // ── NAVIGATION ───────────────────────────────────────────────
 
 function showScreen(id) {
-  // Detach Firebase lobby listener when navigating away from lobby
-  if (id !== "screen-lobby" && typeof _lobbyUnsubscribe === "function") {
+  // Detach Firebase lobby listener when navigating away from lobby (unless going to game)
+  if (id !== "screen-lobby" && id !== "screen-game" && typeof _lobbyUnsubscribe === "function") {
     _lobbyUnsubscribe();
     _lobbyUnsubscribe = null;
   }
@@ -273,6 +273,9 @@ function handleLeaveBackdrop(e) {
 }
 
 function confirmLeave() {
+  if (activeRoom && activeRoom.code) {
+    leaveFirebaseRoom(activeRoom.code, playerId);
+  }
   closeLeaveModal();
   performGoBack();
 }
@@ -502,9 +505,9 @@ function _paintLobby(room) {
   document.getElementById("lobbyPlayerCount").textContent =
     (room.players||[]).length + "/" + room.maxPlayers;
 
-  const playerList = room.playerList || (room.players||[]).map((name, i) => ({
+  const playerList = (room.playerList || (room.players||[]).map((name, i) => ({
     name, id: "player_" + i, ready: false, joinedAt: Date.now()
-  }));
+  }))).filter(p => !room.presence || room.presence[p.id]);
 
   playerList.forEach((player, i) => {
     const isHost          = player.id   === room.hostId;
@@ -551,22 +554,46 @@ function renderLobby(room) {
       // Subscribe to live changes (new players joining, etc.)
       if (typeof _lobbyUnsubscribe === "function") _lobbyUnsubscribe();
       _lobbyUnsubscribe = listenToRoom(latestRoom.code, updatedRoom => {
+        // Detect disconnections before updating activeRoom
+        detectDisconnections(activeRoom, updatedRoom);
+        activeRoom = updatedRoom;
+        
+        // CHECK FOR CANCELLATION (Host left or disconnected)
+        if (updatedRoom.cancelled) {
+          showHostDisconnectedModal(updatedRoom.cancelledReason);
+          return;
+        }
+
         // If the host has started the race, pull everyone else in!
         if (updatedRoom.started && !gameRacing) {
           startRaceFromLobby(true); 
-        } else {
+        } 
+        
+        // If we are in the lobby, repaint it
+        const lobbyActive = document.getElementById("screen-lobby").classList.contains("active");
+        if (lobbyActive) {
           _paintLobby(updatedRoom);
+        }
+
+        // If we are in the game screen and in betting phase, sync bets
+        const gameActive = document.getElementById("screen-game")?.classList.contains("active");
+        if (gameActive && gamePhase === "betting") {
+          gameSyncBetsFromRoom(updatedRoom);
         }
       });
     };
 
     if (isAlreadyIn) {
       // Host — already in the room, just subscribe
+      setupOnDisconnect(room.code, playerId, true);
       enterAndListen(room);
     } else {
       // Joiner — write to Firebase then subscribe
       addPlayerToFirebaseRoom(room.code, myPlayerObj)
-        .then(updatedRoom => enterAndListen(updatedRoom || room))
+        .then(updatedRoom => {
+          setupOnDisconnect(room.code, playerId, false);
+          enterAndListen(updatedRoom || room);
+        })
         .catch(() => enterAndListen(room));  // fallback on error
     }
   } else {
@@ -817,6 +844,60 @@ function shareLobbyInviteLink() {
   }
 }
 
+function returnToHomeFromDisconnect() {
+  document.getElementById("modal-host-disconnected").classList.remove("open");
+  // Force reset game state
+  gameRacing = false;
+  if (animFrame) cancelAnimationFrame(animFrame);
+  if (bettingInterval) clearInterval(bettingInterval);
+  
+  showScreen("screen-home");
+}
+
+function showHostDisconnectedModal(reason) {
+  if (reason) document.getElementById("hostDisconnectedReason").textContent = reason;
+  document.getElementById("modal-host-disconnected").classList.add("open");
+  
+  // Cleanup listener
+  if (typeof _lobbyUnsubscribe === "function") {
+    _lobbyUnsubscribe();
+    _lobbyUnsubscribe = null;
+  }
+}
+
+function detectDisconnections(oldRoom, newRoom) {
+  if (!oldRoom || !newRoom || !oldRoom.presence || !newRoom.presence) return;
+  const oldIds = Object.keys(oldRoom.presence);
+  const newIds = Object.keys(newRoom.presence);
+  
+  const disconnected = oldIds.filter(id => !newIds.includes(id));
+  disconnected.forEach(id => {
+    const player = (oldRoom.playerList || []).find(p => p.id === id);
+    if (player && id !== playerId) {
+      showToast(`${player.name} has disconnected`, "error");
+    }
+  });
+}
+
+function showToast(message, type = "info") {
+  const container = document.getElementById("toast-container");
+  if (!container) return;
+  
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>${message}</span>
+  `;
+  
+  container.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.classList.add("fade-out");
+    setTimeout(() => toast.remove(), 300);
+  }, 4000);
+}
+
 // ── RACE GAME (existing engine) ──────────────────────────────
 // This section re-uses the original casino game on a dynamic screen.
 // The race screen is injected into the DOM at runtime.
@@ -834,7 +915,11 @@ function showRaceGame() {
   showScreen("screen-game");
   gameRoomBets = []; // reset
   initRaceGame();
-  gameGenerateAIBets();
+  if (activeRoom && !activeRoom.code) {
+    gameGenerateAIBets();
+  } else if (activeRoom) {
+    gameSyncBetsFromRoom(activeRoom);
+  }
   gameRenderLiveBets();
 }
 
@@ -854,6 +939,26 @@ function gameGenerateAIBets() {
       gameRoomBets.push({ player: p, horseIndex: hIdx, amount: amt, readyAt });
     }
   });
+}
+
+function gameSyncBetsFromRoom(room) {
+  if (!room || !room.playerList) return;
+  
+  const presence = room.presence || {};
+
+  // Transform room.playerList into gameRoomBets format
+  gameRoomBets = room.playerList
+    .filter(p => p.id !== playerId)
+    .filter(p => presence[p.id]) // Only show players who are currently present
+    .map(p => ({
+      player: p.name,
+      horseIndex: p.horseIndex,
+      amount: p.amount,
+      betConfirmed: !!p.betConfirmed,
+      readyAt: 0 
+    }));
+  
+  gameRenderLiveBets();
 }
 
 function buildRaceScreenHTML() {
@@ -1407,15 +1512,19 @@ function tickBettingTimer() {
   }
 
   // GLOBAL SYNC: Only start the race when the shared timer hits 0
-  if (remaining <= 0) {
+  // OR when all players have confirmed their bets
+  const allPlayersReady = activeRoom && activeRoom.playerList && 
+                          activeRoom.playerList.length > 0 && 
+                          activeRoom.playerList.every(p => p.betConfirmed);
+
+  if (remaining <= 0 || allPlayersReady) {
     clearInterval(bettingInterval);
     
-    // Auto-select a random horse if player didn't pick one
-    if (gameSelectedHorse < 0) {
-      gameSelectHorse(Math.floor(Math.random() * horses.length));
-    }
+    // Auto-select is now DISABLED if the user didn't pick. 
+    // If they haven't picked, gameSelectedHorse remains -1 and they miss out.
+    // (Previously it would auto-select a random horse).
     
-    // Automatically transition to the countdown
+    // Transition to the countdown
     gamePhase = "countdown";
     const btn = document.getElementById("gameRaceBtn");
     if (btn) {
@@ -1423,8 +1532,16 @@ function tickBettingTimer() {
       btn.textContent = "RACING...";
     }
     
-    const betAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
-    startRaceCountdown(betAmt);
+    // If bet wasn't confirmed, they participate with 0 stake and no horse
+    let finalBetAmt = 0;
+    if (isBetConfirmed) {
+      finalBetAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
+    } else {
+      gameSelectedHorse = -1; // No horse for you
+      console.log("Betting cancelled - player did not confirm in time.");
+    }
+    
+    startRaceCountdown(finalBetAmt);
   }
 
   gameRenderLiveBets();
@@ -1538,6 +1655,11 @@ function gameStartRace() {
     const selectedCard = document.getElementById("gcard" + gameSelectedHorse);
     if (selectedCard) selectedCard.classList.add("confirmed");
     
+    // Sync to Firebase if in multiplayer
+    if (activeRoom && activeRoom.code) {
+      updatePlayerBetInFirebase(activeRoom.code, playerId, gameSelectedHorse, betAmt);
+    }
+
     gameRenderLiveBets();
     return;
   }
@@ -1701,8 +1823,9 @@ function gameRenderLiveBets() {
   const elapsed = 30 - bettingTimerSecs;
 
   list.innerHTML = gameRoomBets.map(b => {
-    const isReady = (gamePhase !== "betting") || (elapsed >= b.readyAt);
-    const horse = horses[b.horseIndex];
+    const isReady = (gamePhase !== "betting") || 
+                    (b.betConfirmed !== undefined ? b.betConfirmed : elapsed >= b.readyAt);
+    const horse = b.horseIndex !== undefined ? horses[b.horseIndex] : null;
     
     if (!isReady) {
       return `
@@ -1723,7 +1846,7 @@ function gameRenderLiveBets() {
       return `
         <div class="game-live-bet-card ready">
           <div class="glb-player">
-            <span class="glb-avatar" style="background:${horse.color}"></span>
+            <span class="glb-avatar" style="background:${horse ? horse.color : '#666'}"></span>
             ${b.player}
           </div>
           <div class="glb-info">
@@ -1737,12 +1860,12 @@ function gameRenderLiveBets() {
     return `
       <div class="game-live-bet-card">
         <div class="glb-player">
-          <span class="glb-avatar" style="background:${horse.color}"></span>
+          <span class="glb-avatar" style="background:${horse ? horse.color : '#666'}"></span>
           ${b.player}
         </div>
         <div class="glb-info">
-          <span class="glb-amount">$${b.amount}</span>
-          on <span class="glb-horse" style="color:${horse.color}">${horse.name}</span>
+          <span class="glb-amount">$${b.amount || 0}</span>
+          on <span class="glb-horse" style="color:${horse ? horse.color : '#666'}">${horse ? horse.name : 'No Bet'}</span>
         </div>
       </div>
     `;

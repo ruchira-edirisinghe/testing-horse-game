@@ -294,6 +294,80 @@ function startFirebaseRoom(code) {
 }
 
 /**
+ * Update a specific player's betting status in Firebase.
+ */
+function updatePlayerBetInFirebase(code, playerId, horseIndex, amount) {
+  if (!db) return Promise.resolve();
+  const roomRef = db.ref("rooms/" + code.toUpperCase());
+  return roomRef.once("value").then(snapshot => {
+    const room = snapshot.val();
+    if (!room || !room.playerList) return;
+    
+    const updatedList = room.playerList.map(p => {
+      if (p.id === playerId) {
+        return { 
+          ...p, 
+          betConfirmed: true, 
+          horseIndex: horseIndex, 
+          amount: amount 
+        };
+      }
+      return p;
+    });
+
+    return roomRef.update({ 
+      playerList: updatedList,
+      lastActivity: Date.now()
+    });
+  });
+}
+
+function leaveFirebaseRoom(code, playerId) {
+  if (!db) return Promise.resolve();
+  const roomRef = db.ref("rooms/" + code.toUpperCase());
+  return roomRef.once("value").then(snapshot => {
+    const room = snapshot.val();
+    if (!room) return;
+
+    if (room.hostId === playerId) {
+      // Host is leaving - cancel the room for everyone
+      return roomRef.update({
+        cancelled: true,
+        cancelledReason: "Host left the session",
+        lastActivity: Date.now()
+      });
+    } else {
+      // Regular player leaving - just remove them
+      const updatedList = (room.playerList || []).filter(p => p.id !== playerId);
+      const updatedNames = (room.players || []).filter(n => n !== room.playerList.find(p => p.id === playerId)?.name);
+      return roomRef.update({
+        playerList: updatedList,
+        players: updatedNames,
+        lastActivity: Date.now()
+      });
+    }
+  });
+}
+
+function setupOnDisconnect(code, playerId, isHost) {
+  if (!db || !code) return;
+  const roomRef = db.ref("rooms/" + code.toUpperCase());
+  
+  // Track presence for all players
+  const presenceRef = db.ref(`rooms/${code.toUpperCase()}/presence/${playerId}`);
+  presenceRef.set(true);
+  presenceRef.onDisconnect().remove();
+
+  if (isHost) {
+    roomRef.onDisconnect().update({
+      cancelled: true,
+      cancelledReason: "Host lost connection",
+      lastActivity: Date.now()
+    });
+  }
+}
+
+/**
  * Subscribe to all rooms for the public room list.
  */
 function listenToAllRooms(onUpdate) {

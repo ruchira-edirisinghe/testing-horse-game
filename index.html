@@ -311,6 +311,25 @@
 </div>
 
 <!-- ══════════════════════════════════════════
+     HOST DISCONNECTED MODAL (overlay)
+══════════════════════════════════════════ -->
+<div id="modal-host-disconnected" class="modal-overlay">
+  <div class="modal-box host-disc-modal-box">
+    <div class="disc-icon-wrap" style="text-align:center; margin-bottom:20px">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ff4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+        <line x1="12" y1="2" x2="12" y2="12"></line>
+      </svg>
+    </div>
+    <div class="modal-title" style="color:#ff4444; text-align:center">ARENA CANCELLED</div>
+    <p class="modal-body" id="hostDisconnectedReason" style="text-align:center">The host has lost connection or left the session. You will be returned to the main lobby.</p>
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="returnToHomeFromDisconnect()" style="width:100%">RETURN TO LOBBY</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
      SCREEN 4 — LOADING
 ══════════════════════════════════════════ -->
 <div id="screen-loading" class="screen">
@@ -405,7 +424,8 @@
 </div>
 
 <!-- Scripts: backend data layer first, then UI -->
-<script src="backend.js"></script>
-<script src="script.js"></script>
+  <div id="toast-container" class="toast-container"></div>
+  <script src="backend.js"></script>
+  <script src="script.js"></script>
 </body>
 </html>
