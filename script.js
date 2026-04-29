@@ -556,8 +556,17 @@ function renderLobby(room) {
       _lobbyUnsubscribe = listenToRoom(latestRoom.code, updatedRoom => {
         // Detect disconnections before updating activeRoom
         detectDisconnections(activeRoom, updatedRoom);
+        
+        // Detect room reset for next race (if bettingEndTime was pushed forward)
+        const isReset = activeRoom && updatedRoom.bettingEndTime > activeRoom.bettingEndTime;
+        
         activeRoom = updatedRoom;
         
+        // If the room was reset by host, all players should move to the betting screen
+        if (isReset && !gameRacing) {
+          gameResetForNextRace(false); // reset locally (skip sync to avoid loop)
+        }
+
         // CHECK FOR CANCELLATION (Host left or disconnected)
         if (updatedRoom.cancelled) {
           showHostDisconnectedModal(updatedRoom.cancelledReason);
@@ -1513,9 +1522,14 @@ function tickBettingTimer() {
 
   // GLOBAL SYNC: Only start the race when the shared timer hits 0
   // OR when all players have confirmed their bets
-  const allPlayersReady = activeRoom && activeRoom.playerList && 
-                          activeRoom.playerList.length > 0 && 
-                          activeRoom.playerList.every(p => p.betConfirmed);
+  let allPlayersReady = false;
+  if (activeRoom && activeRoom.playerList) {
+    const presence = activeRoom.presence || {};
+    const presentPlayers = activeRoom.playerList.filter(p => presence[p.id]);
+    if (presentPlayers.length > 0) {
+      allPlayersReady = presentPlayers.every(p => p.betConfirmed);
+    }
+  }
 
   if (remaining <= 0 || allPlayersReady) {
     clearInterval(bettingInterval);

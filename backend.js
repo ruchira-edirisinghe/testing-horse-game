@@ -285,12 +285,31 @@ function addPlayerToFirebaseRoom(code, playerObj) {
  */
 function startFirebaseRoom(code) {
   if (!db) return Promise.resolve();
-  return db.ref("rooms/" + code.toUpperCase()).update({
-    started: true,
-    lastActivity: Date.now(),
-    bettingEndTime: Date.now() + 30000, // 30s for betting
-    raceSeed: Math.random() // Seed for synchronized race outcome
+  const roomRef = db.ref("rooms/" + code.toUpperCase());
+  return roomRef.once("value").then(snapshot => {
+    const room = snapshot.val();
+    if (!room) return;
+    
+    // Clear bet confirmation for everyone for the new race
+    const updatedList = (room.playerList || []).map(p => ({
+      ...p,
+      betConfirmed: false,
+      horseIndex: -1,
+      amount: 0
+    }));
+
+    return roomRef.update({
+      started: true,
+      lastActivity: Date.now(),
+      bettingEndTime: Date.now() + 30000, // 30s for betting
+      raceSeed: Math.random(), // Seed for synchronized race outcome
+      playerList: updatedList
+    });
   });
+}
+
+function resetFirebaseRoomForNextRace(code) {
+  return startFirebaseRoom(code); // Reuse the same logic
 }
 
 /**
