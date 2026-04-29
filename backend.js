@@ -506,15 +506,8 @@ function validateBet(horseIndex, betAmount) {
 }
 
 // ── HISTORY ──────────────────────────────────────────────────
-function recordResult(horse, won, net, bet, allResults) {
-  history.unshift({ 
-    horse: horse, 
-    won: won, 
-    net: net, 
-    bet: bet, 
-    playerName: playerName,
-    allResults: allResults || []
-  });
+function recordResult(horse, won, net, bet) {
+  history.unshift({ horse: horse, won: won, net: net, bet: bet, playerName: playerName });
   if (history.length > MAX_HISTORY) history.pop();
 }
 
