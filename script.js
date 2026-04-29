@@ -635,6 +635,7 @@ function startRaceFromLobby(force) {
 
   // Transition to game
   balance -= activeRoom.stake;
+  gameUpdateBalance(); // Ensure display updates after deduction
   // Jump to game (existing race page)
   showRaceGame();
 }
@@ -1534,9 +1535,19 @@ function tickBettingTimer() {
   if (remaining <= 0 || allPlayersReady) {
     clearInterval(bettingInterval);
     
-    // Auto-select is now DISABLED if the user didn't pick. 
-    // If they haven't picked, gameSelectedHorse remains -1 and they miss out.
-    // (Previously it would auto-select a random horse).
+    // Auto-select/confirm if the user picked a horse but didn't hit confirm
+    let finalBetAmt = 0;
+    if (isBetConfirmed) {
+      finalBetAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
+    } else if (gameSelectedHorse >= 0) {
+      // Auto-confirm their current selection
+      isBetConfirmed = true;
+      finalBetAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
+      console.log("Auto-confirmed bet for #" + (gameSelectedHorse + 1) + ": $" + finalBetAmt);
+    } else {
+      gameSelectedHorse = -1; // No horse for you
+      console.log("Betting cancelled - player did not select or confirm in time.");
+    }
     
     // Transition to the countdown
     gamePhase = "countdown";
@@ -1545,16 +1556,7 @@ function tickBettingTimer() {
       btn.disabled = true;
       btn.textContent = "RACING...";
     }
-    
-    // If bet wasn't confirmed, they participate with 0 stake and no horse
-    let finalBetAmt = 0;
-    if (isBetConfirmed) {
-      finalBetAmt = parseInt(document.getElementById("gameBetAmount").value) || 0;
-    } else {
-      gameSelectedHorse = -1; // No horse for you
-      console.log("Betting cancelled - player did not confirm in time.");
-    }
-    
+
     startRaceCountdown(finalBetAmt);
   }
 
@@ -1716,7 +1718,10 @@ function executeRace(betAmt) {
     syncSeed(activeRoom.raceSeed);
   }
 
+  console.log("Deducting bet amount: $" + betAmt + ". Previous balance: $" + balance);
   balance -= betAmt;
+  gameUpdateBalance();
+  
   gameRacing = true;
   raceCount++;
   document.getElementById("gameRaceBtn").disabled = true;
@@ -1804,6 +1809,7 @@ function gameEndRace(winner, betAmt) {
 
   if (won) {
     const { gross, profit } = calcPayout(winner, betAmt);
+    console.log("Race WON! Adding gross: $" + gross + ". Previous balance: $" + balance);
     balance += gross;
     banner.className = "game-result-banner win";
     document.getElementById("gameResultTitle").textContent = "🏆 WINNER! #" + (winner+1) + " " + horses[winner].name;
@@ -1898,9 +1904,14 @@ function gameResetForNextRace() {
 
 function gameUpdateBalance() {
   const fmt = balance.toLocaleString();
-  const d1 = document.getElementById("gameBalanceDisplay");
+  const ids = ["gameBalanceDisplay", "lobbyBalance", "homeBalance", "roomsBalance"];
+  
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = fmt;
+  });
+
   const d3 = document.getElementById("gameAllInBtn");
-  if (d1) d1.textContent = fmt;
   if (d3) d3.textContent = "ALL IN";
 }
 
