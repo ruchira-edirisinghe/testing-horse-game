@@ -289,54 +289,70 @@ function renderRooms() {
   const searchTerm = (document.getElementById("roomSearchInput")?.value || "").toLowerCase();
   list.innerHTML = "";
 
+  // Filter multiplayer rooms: only show joinable rooms
+  const joinableMultiplayerRooms = multiplayerRooms.filter(room => {
+    if (!room || !room.code) return false;
+    if (room.started) return false;
+    if (room.cancelled) return false;
+    return true;
+  });
+
   // Combine public rooms + multiplayer rooms
-  let allRooms = [...PUBLIC_ROOMS, ...multiplayerRooms];
+  let allRooms = [...PUBLIC_ROOMS, ...joinableMultiplayerRooms];
 
   // Filter by search term
   if (searchTerm) {
     allRooms = allRooms.filter(room => 
-      room.name.toLowerCase().includes(searchTerm)
+      (room.name || "").toLowerCase().includes(searchTerm)
     );
   }
 
   allRooms.forEach(room => {
-    const isPrivate = room.type === "private";
-    const isRanked  = room.tag === "ranked";
-    const joinClass = isPrivate ? "locked" : isRanked ? "ranked-btn" : "open";
+    try {
+      const isPrivate = room.type === "private";
+      const isRanked  = room.tag === "ranked";
+      const joinClass = isPrivate ? "locked" : isRanked ? "ranked-btn" : "open";
 
-    // Left accent class
-    let cardAccent = "fast-play";
-    if (isRanked)  cardAccent = "ranked";
-    if (isPrivate) cardAccent = "private";
+      // Left accent class
+      let cardAccent = "fast-play";
+      if (isRanked)  cardAccent = "ranked";
+      if (isPrivate) cardAccent = "private";
 
-    const card = document.createElement("div");
-    card.className = `room-card ${cardAccent}`;
-    card.onclick = () => handleJoinRoom(room);
+      const card = document.createElement("div");
+      card.className = `room-card ${cardAccent}`;
+      card.onclick = () => handleJoinRoom(room);
 
-    const stakeIcon = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="10" height="10" rx="2" stroke="#6b7399" stroke-width="1"/><path d="M3 5.5h5M5.5 3v5" stroke="#6b7399" stroke-width="1" stroke-linecap="round"/></svg>`;
+      const stakeIcon = `<svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="0.5" y="0.5" width="10" height="10" rx="2" stroke="#6b7399" stroke-width="1"/><path d="M3 5.5h5M5.5 3v5" stroke="#6b7399" stroke-width="1" stroke-linecap="round"/></svg>`;
 
-    const lockIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
-    const gameIcon = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M7 10h2M8 9v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13" cy="10" r="1" fill="currentColor"/></svg>`;
+      const lockIcon = `<svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 7V5a3 3 0 016 0v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      const gameIcon = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="2" y="5" width="16" height="10" rx="3" stroke="currentColor" stroke-width="1.4"/><path d="M7 10h2M8 9v2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="13" cy="10" r="1" fill="currentColor"/></svg>`;
 
-    const playerCount = `${room.players.length} / ${room.maxPlayers}`;
-    
-    card.innerHTML = `
-      <div class="room-icon-wrap" style="color:${isPrivate ? 'var(--text-muted)' : isRanked ? 'var(--gold)' : 'var(--gold-light)'}">
-        ${isPrivate ? lockIcon : gameIcon}
-      </div>
-      <div class="room-info">
-        <div class="room-name">${room.name}</div>
-        <div class="room-meta">
-          <span class="room-stake">${stakeIcon} STAKE: ${room.stake}</span>
-          <span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>
+      const players = room.players || [];
+      const maxPlayers = room.maxPlayers || 8;
+      const playerCount = `${players.length} / ${maxPlayers}`;
+      const tagLabel = room.tagLabel || (isPrivate ? "🔒 PRIVATE" : isRanked ? "★ RANKED" : "⚡ FAST PLAY");
+      const stakeAmount = room.stake || 50;
+      
+      card.innerHTML = `
+        <div class="room-icon-wrap" style="color:${isPrivate ? 'var(--text-muted)' : isRanked ? 'var(--gold)' : 'var(--gold-light)'}">
+          ${isPrivate ? lockIcon : gameIcon}
         </div>
-        <div class="room-players-count">👥 ${playerCount}</div>
-      </div>
-      <button class="room-join-btn ${joinClass}" onclick="event.stopPropagation();handleJoinRoom(${JSON.stringify(room).replace(/"/g,'&quot;')})">
-        ${isPrivate || room.code ? 'ENTER' : 'JOIN'}
-      </button>`;
+        <div class="room-info">
+          <div class="room-name">${room.name || 'Unnamed Room'}</div>
+          <div class="room-meta">
+            <span class="room-stake">${stakeIcon} STAKE: ${stakeAmount}</span>
+            <span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${tagLabel}</span>
+          </div>
+          <div class="room-players-count">👥 ${playerCount}</div>
+        </div>
+        <button class="room-join-btn ${joinClass}" onclick="event.stopPropagation();handleJoinRoom(${JSON.stringify(room).replace(/"/g,'&quot;')})">
+          ${isPrivate || room.code ? 'ENTER' : 'JOIN'}
+        </button>`;
 
-    list.appendChild(card);
+      list.appendChild(card);
+    } catch (e) {
+      console.warn("Skipping malformed room:", room, e);
+    }
   });
 
   // Show "No rooms" message if both lists are empty
