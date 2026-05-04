@@ -281,7 +281,7 @@ function addPlayerToFirebaseRoom(code, playerObj) {
 }
 
 /**
- * Mark a room as started in Firebase.
+ * Mark a room as started in Firebase and set the betting timer.
  */
 function startFirebaseRoom(code) {
   if (!db) return Promise.resolve();
@@ -290,7 +290,7 @@ function startFirebaseRoom(code) {
     const room = snapshot.val();
     if (!room) return;
     
-    // Clear bet confirmation for everyone for the new race
+    // Clear bet confirmation and horse selections for everyone for the new race
     const updatedList = (room.playerList || []).map(p => ({
       ...p,
       betConfirmed: false,
@@ -300,11 +300,25 @@ function startFirebaseRoom(code) {
 
     return roomRef.update({
       started: true,
+      cancelled: false, // Ensure it's not cancelled
       lastActivity: Date.now(),
       bettingEndTime: Date.now() + 30000, // 30s for betting
       raceSeed: Math.random(), // Seed for synchronized race outcome
       playerList: updatedList
     });
+  });
+}
+
+/**
+ * Mark a room as finished (not started) to prevent new joiners from jumping into an old race state.
+ */
+function endFirebaseRoom(code) {
+  if (!db || !code) return Promise.resolve();
+  const roomRef = db.ref("rooms/" + code.toUpperCase());
+  return roomRef.update({
+    started: false,
+    bettingEndTime: null,
+    lastActivity: Date.now()
   });
 }
 

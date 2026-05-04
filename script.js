@@ -1505,12 +1505,16 @@ function tickBettingTimer() {
   // Calculate time remaining based on the global timestamp from Firebase
   let now = Date.now();
   let remaining = 0;
+  let hasValidTimer = false;
+
   if (activeRoom && activeRoom.bettingEndTime) {
     remaining = Math.max(0, Math.ceil((activeRoom.bettingEndTime - now) / 1000));
+    hasValidTimer = true;
   } else {
     // Fallback if room data hasn't loaded yet
     remaining = bettingTimerSecs;
     if (remaining > 0) bettingTimerSecs--;
+    hasValidTimer = false;
   }
   
   const timerCell = document.getElementById("gameHeaderTimerCell");
@@ -1534,20 +1538,40 @@ function tickBettingTimer() {
   // GLOBAL SYNC: Only start the race when the shared timer hits 0
   // OR when all players have confirmed their bets
   let allPlayersReady = false;
+  let canStartIfTimerZero = true;
+
   if (activeRoom && activeRoom.playerList) {
     const presence = activeRoom.presence || {};
     const presentPlayers = activeRoom.playerList.filter(p => presence[p.id]);
-    if (presentPlayers.length > 0) {
-      allPlayersReady = presentPlayers.every(p => p.betConfirmed);
+    
+    if (activeRoom.code) {
+      // MULTIPLAYER: Ensure at least 2 players are present and BOTH confirmed.
+      // If only 1 player is there, the race won't start automatically.
+      const everyoneConfirmed = presentPlayers.length >= 2 && presentPlayers.every(p => p.betConfirmed);
+      allPlayersReady = everyoneConfirmed;
+      
+      // If timer hits 0, only start if we have at least 2 players and they confirmed.
+      // This enforces the "only starts when both confirm" rule.
+      if (presentPlayers.length < 2 || !presentPlayers.every(p => p.betConfirmed)) {
+        canStartIfTimerZero = false;
+        if (remaining <= 0 && timerLbl) {
+          timerLbl.textContent = "WAITING FOR OTHERS...";
+          timerVal.textContent = "—";
+        }
+      }
+    } else {
+      // Single player / Public fallback
+      if (presentPlayers.length > 0) {
+        allPlayersReady = presentPlayers.every(p => p.betConfirmed);
+      }
     }
   }
 
-  if (remaining <= 0 || allPlayersReady) {
+  // Final check: start the race if all are ready OR if timer is 0 and we are allowed to start.
+  // Note: We also check hasValidTimer to avoid starting immediately with a stale (past) bettingEndTime
+  // during the very first tick of a new joiner.
+  if (allPlayersReady || (remaining <= 0 && canStartIfTimerZero && hasValidTimer)) {
     clearInterval(bettingInterval);
-    
-    // Auto-select is now DISABLED if the user didn't pick. 
-    // If they haven't picked, gameSelectedHorse remains -1 and they miss out.
-    // (Previously it would auto-select a random horse).
     
     // Transition to the countdown
     gamePhase = "countdown";
@@ -1795,6 +1819,11 @@ function gameEndRace(winner, betAmt) {
   
   if (module) module.style.display = "none";
   if (banner) banner.style.display = "flex";
+
+  // MULTIPLAYER: If host, mark room as not started so joiners stay in lobby
+  if (activeRoom && activeRoom.code && playerName === activeRoom.host) {
+    endFirebaseRoom(activeRoom.code);
+  }
   
   // Handle the case where player didn't bet (gameSelectedHorse === -1 or betAmt === 0)
   const didBet = gameSelectedHorse >= 0 && betAmt > 0;
