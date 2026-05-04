@@ -580,7 +580,7 @@ function renderLobby(room) {
         
         // If the room was reset by host, all players should move to the betting screen
         if (isReset && !gameRacing) {
-          gameResetForNextRace(false); // reset locally (skip sync to avoid loop)
+          gameResetForNextRace(true); // reset locally (skip sync to avoid loop)
         }
 
         // CHECK FOR CANCELLATION (Host left or disconnected)
@@ -590,7 +590,8 @@ function renderLobby(room) {
         }
 
         // If the host has started the race, pull everyone else in!
-        if (updatedRoom.started && !gameRacing) {
+        const isGameScreen = document.getElementById("screen-game")?.classList.contains("active");
+        if (updatedRoom.started && !isGameScreen) {
           startRaceFromLobby(true); 
         } 
         
@@ -1905,7 +1906,17 @@ function gameRenderLiveBets() {
 }
 
 
-function gameResetForNextRace() {
+function gameResetForNextRace(isFromHostUpdate = false) {
+  // If multiplayer host, update Firebase to start next betting phase
+  if (activeRoom && activeRoom.code && playerName === activeRoom.host && !isFromHostUpdate) {
+    resetFirebaseRoomForNextRace(activeRoom.code);
+  }
+
+  // Clear the old betting time so we don't instantly jump to 0 while waiting for Firebase sync
+  if (activeRoom && !isFromHostUpdate) {
+    activeRoom.bettingEndTime = null;
+  }
+
   const banner = document.getElementById("gameResultBanner");
   const module = document.getElementById("gameBetModule");
   if (banner) banner.style.display = "none";
