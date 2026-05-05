@@ -2220,7 +2220,7 @@ const bgMusic = document.getElementById("bgMusic");
 const btnMute = document.getElementById("btnMute");
 let musicPlaying = false;
 let isFading = false;
-const maxVolume = 0.35; 
+const maxVolume = 0.15; 
 
 function toggleMusic() {
   if (!bgMusic || isFading) return;
