@@ -209,6 +209,17 @@ function showScreen(id) {
   target.style.display = "flex";
   target.classList.add("active");
 
+  // POPUP SCREENS: lock body scroll and keep page at top to prevent upward drift
+  const POPUP_SCREENS = ["screen-create", "screen-rooms"];
+  if (POPUP_SCREENS.includes(id)) {
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+  } else {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
+
   // Handle screen-specific initializations
   if (id === "screen-create") {
     generatedInviteCode = null;   // always get a fresh code
@@ -255,6 +266,17 @@ function performGoBack() {
   if (target) {
     target.style.display = "flex";
     target.classList.add("active");
+
+  // POPUP SCREENS: lock body scroll and keep page at top to prevent upward drift
+  const POPUP_SCREENS = ["screen-create", "screen-rooms"];
+  if (POPUP_SCREENS.includes(id)) {
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+    window.scrollTo(0, 0);
+  } else {
+    document.body.style.overflow = "";
+    document.documentElement.style.overflow = "";
+  }
   }
 }
 
@@ -375,7 +397,24 @@ function handleJoinRoom(room) {
     return;
   }
 
-  // If multiplayer room, ask for player name confirmation
+  // Sample game: make the current player the admin/host
+  if (room.isSampleGame) {
+    // Deep clone so we don't mutate the template
+    const sampleRoom = JSON.parse(JSON.stringify(room));
+    sampleRoom.host = playerName;
+    sampleRoom.hostId = playerId;
+    // Remove the AI host placeholder and add the real player
+    sampleRoom.playerList = sampleRoom.playerList.filter(p => p.id !== "bot_gm");
+    sampleRoom.players = sampleRoom.players.filter(p => p !== "GameMaster_AI");
+    // Add current player at the top
+    sampleRoom.playerList.unshift({ id: playerId, name: playerName, ready: true, joinedAt: Date.now() });
+    sampleRoom.players.unshift(playerName);
+    pendingRoom = sampleRoom;
+    loadRoom(sampleRoom);
+    return;
+  }
+
+  // If multiplayer room with a Firebase code
   if (room.code) {
     loadRoom(pendingRoom);
   } else {
@@ -486,10 +525,10 @@ function _paintLobby(room) {
       ${codeDisplay}
     </div>
     <div class="lobby-actions">
-      <button class="btn-lobby-invite" onclick="openInviteModal()">
+      ${room.isSampleGame ? '' : `<button class="btn-lobby-invite" onclick="openInviteModal()">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
         INVITE FRIENDS
-      </button>
+      </button>`}
     </div>`;
 
   document.getElementById("lobbyDetails").innerHTML = `
@@ -2175,3 +2214,95 @@ document.addEventListener('DOMContentLoaded', () => {
     soundManager = new SoundManager();
     interactionManager = new InteractionManager(soundManager);
 });
+
+// ── FINAL ROBUST BACKGROUND MUSIC MANAGEMENT ───────────────────────────
+const bgMusic = document.getElementById("bgMusic");
+const btnMute = document.getElementById("btnMute");
+let musicPlaying = false;
+let isFading = false;
+const maxVolume = 0.35; 
+
+function toggleMusic() {
+  if (!bgMusic || isFading) return;
+  
+  if (musicPlaying) {
+    isFading = true;
+    if (btnMute) btnMute.classList.add("is-muted"); // Update UI immediately
+    fadeOut(bgMusic, 600, () => {
+      bgMusic.pause();
+      musicPlaying = false;
+      isFading = false;
+    });
+  } else {
+    isFading = true;
+    if (btnMute) btnMute.classList.remove("is-muted"); // Update UI immediately
+    bgMusic.play().then(() => {
+      fadeIn(bgMusic, 600, () => {
+        musicPlaying = true;
+        isFading = false;
+      });
+    }).catch(e => {
+      console.log("Play failed:", e);
+      isFading = false;
+    });
+  }
+}
+
+function fadeIn(audio, duration, callback) {
+  let start = null;
+  function step(timestamp) {
+    if (!start) start = timestamp;
+    let progress = timestamp - start;
+    audio.volume = Math.min((progress / duration) * maxVolume, maxVolume);
+    if (progress < duration) {
+      window.requestAnimationFrame(step);
+    } else {
+      audio.volume = maxVolume;
+      if (callback) callback();
+    }
+  }
+  window.requestAnimationFrame(step);
+}
+
+function fadeOut(audio, duration, callback) {
+  let initialVolume = audio.volume;
+  let start = null;
+  function step(timestamp) {
+    if (!start) start = timestamp;
+    let progress = timestamp - start;
+    audio.volume = Math.max(initialVolume - (progress / duration) * initialVolume, 0);
+    if (progress < duration) {
+      window.requestAnimationFrame(step);
+    } else {
+      audio.volume = 0;
+      if (callback) callback();
+    }
+  }
+  window.requestAnimationFrame(step);
+}
+
+// Global click to start music (Initial interaction)
+document.addEventListener("click", function handleInitialClick() {
+  if (!musicPlaying && bgMusic) {
+    bgMusic.play().then(() => {
+      fadeIn(bgMusic, 1500, () => {
+        musicPlaying = true;
+      });
+      if(btnMute) btnMute.classList.remove("is-muted");
+    }).catch(err => console.log("Autoplay blocked:", err));
+  }
+  document.removeEventListener("click", handleInitialClick);
+}, { once: true });
+
+
+// ── CLICK OUTSIDE POPUP TO CLOSE ───────────────────────────────────────────
+document.addEventListener("click", function(e) {
+  // If the user clicks directly on the transparent overlay of the popup screens
+  if (e.target.id === "screen-create" || e.target.id === "screen-rooms") {
+    // Check if they are currently active just to be safe
+    if (e.target.classList.contains("active")) {
+      goBack();
+    }
+  }
+});
+
