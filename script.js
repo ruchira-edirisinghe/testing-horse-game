@@ -2052,3 +2052,126 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1000);
   }
 });
+
+// ── INTERACTION MANAGERS ─────────────────────────────────────
+
+class SoundManager {
+  constructor() {
+    this.ctx = null;
+    this.enabled = true;
+  }
+
+  initContext() {
+    if (!this.ctx) {
+      this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+  }
+
+  playClick() {
+    if (!this.enabled) return;
+    this.initContext();
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    const filter = this.ctx.createBiquadFilter();
+
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, this.ctx.currentTime + 0.1);
+
+    gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(1200, this.ctx.currentTime);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.ctx.destination);
+
+    osc.start();
+    osc.stop(this.ctx.currentTime + 0.1);
+  }
+}
+
+class InteractionManager {
+  constructor(soundManager) {
+    this.soundManager = soundManager;
+    this.init();
+  }
+
+  init() {
+    document.body.addEventListener('mousedown', (e) => {
+      const target = e.target.closest('button, .room-card, .btn-primary, .btn-secondary, .btn-back, .btn-ghost, .btn-leave, .btn-create-final, .btn-lobby-invite, .btn-icon-copy, .btn-share-link, .btn-start, .btn-toggle-password');
+      
+      if (target) {
+        this.createRipple(e, target);
+        this.createParticles(e);
+        this.soundManager.playClick();
+      }
+    });
+  }
+
+  createRipple(e, target) {
+    const ripple = document.createElement('div');
+    ripple.className = 'ripple';
+    
+    const rect = target.getBoundingClientRect();
+    const size = Math.max(rect.width, rect.height) * 2;
+    const x = e.clientX - rect.left - size / 2;
+    const y = e.clientY - rect.top - size / 2;
+    
+    ripple.style.width = ripple.style.height = `${size}px`;
+    ripple.style.left = `${x}px`;
+    ripple.style.top = `${y}px`;
+    
+    target.appendChild(ripple);
+    
+    setTimeout(() => ripple.remove(), 600);
+  }
+
+  createParticles(e) {
+    const particleCount = 12;
+    const x = e.clientX;
+    const y = e.clientY;
+
+    for (let i = 0; i < particleCount; i++) {
+      const particle = document.createElement('div');
+      particle.className = 'interaction-particle';
+      
+      const size = Math.random() * 4 + 2;
+      particle.style.width = `${size}px`;
+      particle.style.height = `${size}px`;
+      
+      const destinationX = (Math.random() - 0.5) * 150;
+      const destinationY = (Math.random() - 0.5) * 150;
+      const rotation = Math.random() * 360;
+      const delay = Math.random() * 100;
+
+      particle.style.left = `${x}px`;
+      particle.style.top = `${y}px`;
+      particle.style.opacity = '1';
+      
+      document.body.appendChild(particle);
+
+      const animation = particle.animate([
+        { transform: 'translate(0, 0) rotate(0deg)', opacity: 1 },
+        { transform: `translate(${destinationX}px, ${destinationY}px) rotate(${rotation}deg)`, opacity: 0 }
+      ], {
+        duration: Math.random() * 600 + 400,
+        easing: 'cubic-bezier(0, .9, .57, 1)',
+        delay: delay
+      });
+
+      animation.onfinish = () => particle.remove();
+    }
+  }
+}
+
+// Global initialization for sound and effects
+let soundManager, interactionManager;
+document.addEventListener('DOMContentLoaded', () => {
+    soundManager = new SoundManager();
+    interactionManager = new InteractionManager(soundManager);
+});

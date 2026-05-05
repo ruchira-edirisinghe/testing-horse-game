@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Horse Racing Elite - Multiplayer</title>
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Bebas+Neue&family=Exo+2:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- Firebase compat SDK (exposes firebase.database() globally) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+</head>
+<body>
+<div id="dotted-surface-container"></div>
+
+<!-- ══════════════════════════════════════════
+     PLAYER NAME MODAL (entry point for multiplayer)
+══════════════════════════════════════════ -->
+<div id="modal-player-name" class="modal-overlay open">
+  <div class="modal-box player-name-modal-box">
+    <div class="player-name-icon">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+        <circle cx="12" cy="7" r="4"></circle>
+      </svg>
+    </div>
+    <div class="modal-title">ENTER YOUR NAME</div>
+    <p class="modal-body">Choose a racing name for this session. Max 20 characters, letters/numbers/underscore only.</p>
+    <input type="text" id="playerNameInput" class="modal-input" placeholder="e.g. ShadowRider" maxlength="20" onkeydown="if(event.key==='Enter')submitPlayerName()"/>
+    <div class="modal-error" id="playerNameError"></div>
+    <div class="modal-btns">
+      <button class="btn-primary small" onclick="submitPlayerName()" style="width:100%">ENTER THE ARENA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 1 — HOME
+══════════════════════════════════════════ -->
+<div id="screen-home" class="screen active">
+  <div class="home-top-bar">
+    <button class="btn-back" onclick="goBack()">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L6 9L11 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <div class="top-bar-right">
+      <div class="player-badge" id="playerBadge" style="display:none">
+        <span class="player-name-badge" id="playerNameBadge">Anonymous</span>
+      </div>
+      <div class="credits-badge">
+        <span class="credits-num">1,250</span>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </div>
+      <div class="avatar-chip">
+        <div class="avatar-inner" id="playerAvatar">👤</div>
+        <div class="avatar-online-dot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-hero">
+    <div class="hero-ambient"></div>
+    <div class="hero-logo-wrap">
+      <img src="assets/logo-vertical.png" alt="Horse Racing Elite" class="logo-vertical"
+           onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'"/>
+      <div id="logo-fallback" class="logo-fallback" style="display:none">
+        <div class="fallback-horse">🏇</div>
+        <div class="fallback-title">HORSE RACING</div>
+        <div class="fallback-sub">ELITE</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="home-card">
+    <div class="home-card-heading">READY FOR THE <span class="gold-text">RACE?</span></div>
+    <p class="home-card-body">Enter an existing arena or forge your own championship track. Stake your credits and dominate the field.</p>
+    <div class="home-btn-row">
+      <button class="btn-primary" onclick="showScreen('screen-create')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M9 5.5v7M5.5 9h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        CREATE ROOM
+      </button>
+      <button class="btn-secondary" onclick="showScreen('screen-rooms')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2.5" stroke="currentColor" stroke-width="1.5"/><path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        JOIN PUBLIC ROOM
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 2 — CREATE ROOM
+══════════════════════════════════════════ -->
+<div id="screen-create" class="screen">
+  <div class="create-room-inner">
+    <div class="sub-top-bar">
+      <button class="btn-back gold-themed" onclick="goBack()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        Back
+      </button>
+    </div>
+    
+    <div class="create-room-content">
+      <h1 class="create-title">CREATE A NEW ROOM</h1>
+      
+      <div class="create-form">
+        <input type="text" id="create-room-name" placeholder="Enter Room Name" class="create-input">
+        
+        <div class="dropdown-group" onclick="toggleDropdown('stake-options')">
+          <label>Edit Stake</label>
+          <div class="custom-select">
+            <span id="selected-stake">50 CREDITS 🪙</span>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div id="stake-options" class="options-list">
+            <div onclick="selectStake(25, event)">25 CREDITS 🪙</div>
+            <div onclick="selectStake(50, event)">50 CREDITS 🪙</div>
+            <div onclick="selectStake(100, event)">100 CREDITS 🪙</div>
+            <div onclick="selectStake(200, event)">200 CREDITS 🪙</div>
+            <div onclick="selectStake(500, event)">500 CREDITS 🪙</div>
+          </div>
+        </div>
+
+        <div class="dropdown-group" onclick="toggleDropdown('icon-options')">
+          <label>Edit Icon</label>
+          <div class="custom-select">
+            <div class="selected-icon-wrap">
+              <span id="selected-icon">🎮</span>
+            </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+          </div>
+          <div id="icon-options" class="options-list">
+            <div onclick="selectIcon('🎮', event)">🎮 Gaming</div>
+            <div onclick="selectIcon('🐎', event)">🐎 Racing</div>
+            <div onclick="selectIcon('🏆', event)">🏆 Trophy</div>
+            <div onclick="selectIcon('⚡', event)">⚡ Thunder</div>
+          </div>
+        </div>
+
+        <div class="privacy-toggle-group">
+          <div class="privacy-row">
+            <div class="privacy-info">
+              <div class="privacy-label">PRIVATE ARENA</div>
+              <div class="privacy-desc">Only players with password can join</div>
+            </div>
+            <label class="toggle-switch">
+              <input type="checkbox" id="create-is-private" onchange="togglePasswordInput(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+          
+          <div id="password-input-wrap" class="password-input-wrap" style="display:none">
+            <div class="password-field">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+              <input type="password" id="create-room-pass" placeholder="Enter Arena Password" class="create-input mini">
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('create-room-pass')">
+                <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="invite-card">
+          <div class="invite-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E91E63" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+            <h2>INVITE A FRIEND</h2>
+          </div>
+          <p class="invite-desc">Your unique invite code will be generated when you create the room.</p>
+          
+          <div class="invite-code-row" id="inviteCodeRow" style="opacity:0.5">
+            <input type="text" id="invite-code-val" value="---- ----" readonly>
+            <button class="btn-icon-copy" onclick="copyInviteCode()" disabled>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+            </button>
+          </div>
+          
+          <button class="btn-share-link" onclick="shareInviteLink()" disabled id="shareInviteBtn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+            SHARE LINK
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="create-footer">
+      <button class="btn-create-final" onclick="handleCreateRoom()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        CREATE ROOM
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 3 — LIVE ARENAS LIST
+══════════════════════════════════════════ -->
+<div id="screen-rooms" class="screen">
+  <div class="sub-top-bar">
+    <button class="btn-back" onclick="goBack()">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L6 9L11 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <img src="assets/logo-horizontal.png" alt="Horse Racing Elite" class="logo-horizontal"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+    <div class="hlogo-fallback" style="display:none">🏇 ELITE</div>
+    <div class="credits-badge">
+      <span class="credits-num">1,250</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="rooms-header">
+    <div class="live-indicator">
+      <span class="live-pulse"></span>
+      <span class="live-label">LIVE ARENAS</span>
+    </div>
+    <span class="online-count">24 JOCKEYS ONLINE</span>
+  </div>
+
+  <div class="rooms-search-wrap">
+    <div class="rooms-search-inner">
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="roomSearchInput" placeholder="Search by arena name..." oninput="renderRooms()">
+      </div>
+    </div>
+  </div>
+
+  <div class="rooms-scroll">
+    <div class="rooms-list" id="roomsList"></div>
+  </div>
+
+  <div class="rooms-footer">
+    <div class="rooms-footer-btns">
+      <button class="btn-secondary" onclick="openJoinCodeModal()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3"/></svg>
+        JOIN BY CODE
+      </button>
+      <button class="btn-primary" onclick="showScreen('screen-create')">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M9 5.5v7M5.5 9h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        CREATE ROOM
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     ROOM PASSWORD MODAL (overlay)
+     Shown when trying to enter a private room
+══════════════════════════════════════════ -->
+<div id="modal-room-password" class="modal-overlay" onclick="handleRoomPasswordBackdrop(event)">
+  <div class="modal-box room-pass-modal-box">
+    <div class="modal-lock-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0110 0v4"></path></svg>
+    </div>
+    <div class="modal-title">ARENA PASSWORD</div>
+    <p class="modal-body">This is a private arena. Please enter the password to enter the gates.</p>
+    <div class="modal-input-wrap password-toggle-wrap">
+      <input type="password" id="roomPasswordInput" class="modal-input" placeholder="Enter Password" onkeydown="if(event.key==='Enter')submitRoomPassword()"/>
+      <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('roomPasswordInput')">
+        <svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+      </button>
+    </div>
+    <div class="modal-error" id="roomPasswordError"></div>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeRoomPasswordModal()">Cancel</button>
+      <button class="btn-primary small" onclick="submitRoomPassword()">ENTER ARENA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     JOIN BY CODE MODAL (overlay)
+══════════════════════════════════════════ -->
+<div id="modal-join-code" class="modal-overlay" onclick="handleJoinCodeBackdrop(event)">
+  <div class="modal-box join-code-modal-box">
+    <div class="modal-lock-icon">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3"/></svg>
+    </div>
+    <div class="modal-title">ENTER INVITE CODE</div>
+    <p class="modal-body">Enter the secret arena code shared by your friend to enter the gates.</p>
+    <input type="text" id="joinCodeInput" class="modal-input" placeholder="e.g. ABC1XYZ9" oninput="this.value = this.value.toUpperCase()" onkeydown="if(event.key==='Enter')submitJoinCode()"/>
+    <div class="modal-error" id="joinCodeError"></div>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeJoinCodeModal()">Cancel</button>
+      <button class="btn-primary small" onclick="submitJoinCode()">JOIN ARENA</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     LEAVE CONFIRMATION MODAL (overlay)
+══════════════════════════════════════════ -->
+<div id="modal-leave" class="modal-overlay" onclick="handleLeaveBackdrop(event)">
+  <div class="modal-box leave-modal-box">
+    <div class="leave-icon-wrap">
+      <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="22" stroke="#c9a227" stroke-width="2.5" opacity="0.3"/>
+        <circle cx="24" cy="24" r="16" stroke="#c9a227" stroke-width="2"/>
+        <path d="M24 16v10" stroke="#e8be45" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="24" cy="32" r="2" fill="#e8be45"/>
+      </svg>
+    </div>
+    <div class="modal-title">LEAVING THE ARENA</div>
+    <p class="modal-body">All race progress will be lost and you'll be returned to the lobbies. Are you sure you want to leave?</p>
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeLeaveModal()">STAY</button>
+      <button class="btn-leave" onclick="confirmLeave()">LEAVE</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     HOST DISCONNECTED MODAL (overlay)
+══════════════════════════════════════════ -->
+<div id="modal-host-disconnected" class="modal-overlay">
+  <div class="modal-box host-disc-modal-box">
+    <div class="disc-icon-wrap" style="text-align:center; margin-bottom:20px">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="#ff4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+        <line x1="12" y1="2" x2="12" y2="12"></line>
+      </svg>
+    </div>
+    <div class="modal-title" style="color:#ff4444; text-align:center">ARENA CANCELLED</div>
+    <p class="modal-body" id="hostDisconnectedReason" style="text-align:center">The host has lost connection or left the session. You will be returned to the main lobby.</p>
+    <div class="modal-btns">
+      <button class="btn-primary" onclick="returnToHomeFromDisconnect()" style="width:100%">RETURN TO LOBBY</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 4 — LOADING
+══════════════════════════════════════════ -->
+<div id="screen-loading" class="screen">
+  <div class="loading-content">
+    <div class="loading-track-wrap">
+      <div class="loading-track-rail"></div>
+      <div class="loading-horse-runner" id="loadingHorseRunner">🏇</div>
+      <div class="loading-dust" id="loadingDust"></div>
+    </div>
+    <div class="loading-label" id="loadingLabel">ENTERING THE ARENA…</div>
+    <div class="loading-room-name" id="loadingRoomName"></div>
+    <div class="loading-bar-wrap">
+      <div class="loading-bar-fill" id="loadingBarFill"></div>
+    </div>
+    <div class="loading-dots"><span></span><span></span><span></span></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN 5 — ROOM LOBBY
+══════════════════════════════════════════ -->
+<div id="screen-lobby" class="screen">
+  <div class="sub-top-bar">
+    <button class="btn-back" onclick="goBack()">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M11 4L6 9L11 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Back
+    </button>
+    <img src="assets/logo-horizontal.png" alt="Horse Racing Elite" class="logo-horizontal"
+         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
+    <div class="hlogo-fallback" style="display:none">🏇 ELITE</div>
+    <div class="credits-badge">
+      <span class="credits-num">1,250</span>
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
+    </div>
+  </div>
+
+  <div class="lobby-banner" id="lobbyBanner"></div>
+
+  <div class="lobby-main-content">
+    <!-- Left Column: Details -->
+    <div class="lobby-col-left">
+      <div class="lobby-section-title">ARENA SPECIFICATIONS</div>
+      <div class="lobby-details-grid" id="lobbyDetails"></div>
+    </div>
+
+    <!-- Right Column: Players -->
+    <div class="lobby-col-right">
+      <div class="lobby-section-title">
+        JOCKEYS AT THE GATE
+        <span class="lobby-player-count" id="lobbyPlayerCount"></span>
+      </div>
+      <div class="lobby-players" id="lobbyPlayers"></div>
+    </div>
+  </div>
+
+  <div class="lobby-footer">
+    <div class="lobby-stake-note" id="lobbyStakeNote"></div>
+    <button class="btn-start" onclick="startRaceFromLobby()">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><polygon points="6,4 16,10 6,16" fill="currentColor"/></svg>
+      START RACE
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     INVITE MODAL (overlay)
+══════════════════════════════════════════ -->
+<div id="modal-invite" class="modal-overlay" onclick="handleInviteBackdrop(event)">
+  <div class="modal-box invite-modal-box">
+    <div class="invite-header">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+      <h2>INVITE FRIENDS</h2>
+    </div>
+    <p class="modal-body">Share this code with your friends so they can join this arena directly.</p>
+    
+    <div class="invite-code-row">
+      <input type="text" id="lobby-invite-code-val" value="----" readonly>
+      <button class="btn-icon-copy" onclick="copyLobbyInviteCode()">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+      </button>
+    </div>
+    
+    <button class="btn-share-link" onclick="shareLobbyInviteLink()" style="margin-top:10px; width:100%">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 12v8a2 2 0 002 2h12a2 2 0 002-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+      SHARE INVITE LINK
+    </button>
+
+    <div class="modal-btns">
+      <button class="btn-ghost" onclick="closeInviteModal()" style="width:100%">CLOSE</button>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts: backend data layer first, then UI -->
+  <div id="toast-container" class="toast-container"></div>
+  <script src="backend.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>
