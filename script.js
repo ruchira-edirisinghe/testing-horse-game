@@ -7,6 +7,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   initFirebase();   // Connect to Firebase Realtime Database
   initSpeedLinesBackground();
+  gameSetHorsesRunning(false);
   
   // Listen for all multiplayer rooms globally
   listenToAllRooms(rooms => {
@@ -1028,7 +1029,7 @@ function buildRaceScreenHTML() {
     </button>
     <img src="assets/logo-horizontal.png" alt="Horse Racing Elite" class="logo-horizontal"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
-    <div class="hlogo-fallback" style="display:none">🏇 ELITE</div>
+    <div class="hlogo-fallback" style="display:none; align-items:center; gap:5px"><img src="assets/horse.gif" width="24" height="15" style="transform: scaleX(-1)"> ELITE</div>
     <div class="credits-badge">
       <span class="credits-num" id="gameBalanceDisplay">0</span>
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
@@ -1203,7 +1204,7 @@ function buildRaceScreenHTML() {
   .game-finish-line{position:absolute;right:130px;top:0;bottom:0;width:4px;background:repeating-linear-gradient(0deg,#fff 0,#fff 6px,#111 6px,#111 12px);z-index:10;box-shadow:0 0 6px rgba(255,255,255,0.3)}
   .game-finish-flag{position:absolute;right:124px;top:-22px;font-size:16px;z-index:11}
   .game-start-line{position:absolute;left:38px;top:0;bottom:0;width:2px;background:rgba(255,255,255,0.25);z-index:10}
-  .game-lane{height:44px;display:flex;align-items:center;padding:3px 8px;border-bottom:1px dashed rgba(255,255,255,0.1);position:relative;overflow:hidden}
+  .game-lane{height:44px;display:flex;align-items:center;padding:3px 8px;border-bottom:1px dashed rgba(255,255,255,0.1);position:relative;overflow:visible}
   .game-lane:last-child{border-bottom:none}
   .game-lane-num{width:18px;font-family:var(--font-ui);font-size:12px;font-weight:700;color:rgba(255,255,200,0.6);text-align:center;flex-shrink:0;z-index:2}
   .game-horse-wrap{position:absolute;left:0;top:0;bottom:0;display:flex;align-items:center;transition:left 0.04s linear;z-index:5}
@@ -1218,22 +1219,55 @@ function buildRaceScreenHTML() {
   .game-section-hint.pulse{animation:gpulse 0.8s ease infinite alternate}
   @keyframes gpulse{from{box-shadow:none;color:var(--text-muted)}to{color:var(--gold);text-shadow:0 0 8px rgba(201,162,39,0.4)}}
 
+  .horse-img{filter: hue-rotate(var(--horse-hue, 0deg)); transition: filter 0.3s ease}
+
   /* ── Horse Cards Grid ── */
-  .game-cards-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:0 0 16px}
-  .game-horse-card{background:var(--bg-card);border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:all 0.15s;position:relative;overflow:hidden}
-  .game-horse-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--card-color,var(--gold-dim));opacity:0.6}
-  .game-horse-card:hover{border-color:var(--gold-dim);background:var(--bg-card-2);transform:translateY(-2px)}
-  .game-horse-card.selected{border-color:var(--gold);background:rgba(201,162,39,0.06);box-shadow:0 0 20px rgba(201,162,39,0.15)}
-  .game-horse-card.selected::after{content:'✓ SELECTED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:700;color:var(--gold);letter-spacing:1px}
-  .game-horse-card.confirmed{border-color:#00ff88;background:rgba(0,255,136,0.05)}
-  .game-horse-card.confirmed::after{content:'🔒 LOCKED';position:absolute;top:8px;right:10px;font-family:var(--font-ui);font-size:10px;font-weight:800;color:#00ff88;letter-spacing:1px}
+  .game-cards-grid{display:grid;grid-template-columns:repeat(1,1fr);gap:20px;padding:0 20px 20px}
+  @media(min-width:1000px){.game-cards-grid{grid-template-columns:repeat(2,1fr)}}
+  .game-horse-card{background:#161922;border:1px solid rgba(255,255,255,0.08);border-radius:24px;padding:24px;cursor:pointer;transition:all 0.3s cubic-bezier(0.4, 0, 0.2, 1);position:relative;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.3)}
+  .game-horse-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;border-top:6px solid var(--card-color);border-left:6px solid var(--card-color);border-radius:24px 0 0 0;pointer-events:none;opacity:0.9}
+  .game-horse-card:hover{transform:translateY(-5px);border-color:rgba(255,255,255,0.15);background:#1c202a;box-shadow:0 15px 40px rgba(0,0,0,0.5)}
+  .game-horse-card.selected{border-color:var(--card-color);background:rgba(255,255,255,0.02);box-shadow:0 0 30px rgba(0,0,0,0.4)}
+
+  .game-horse-card.confirmed{background:rgba(0,255,136,0.02);border-color:#00ff88}
+
   .game-horse-card.winner{border-color:#00ff88;background:#002215;animation:gwinner 1s ease infinite alternate}
   @keyframes gwinner{from{box-shadow:0 0 6px rgba(0,255,136,0.2)}to{box-shadow:0 0 20px rgba(0,255,136,0.5)}}
 
-  .ghc-header{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-  .ghc-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;box-shadow:0 0 6px rgba(255,255,255,0.15)}
-  .ghc-name{font-family:var(--font-ui);font-size:14px;font-weight:700;color:var(--text-primary);line-height:1.1}
-  .ghc-odds{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--gold-light);line-height:1;margin-top:2px}
+  .ghc-head{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+  .ghc-dot{width:12px;height:12px;border-radius:50%;background:var(--card-color);box-shadow:0 0 10px var(--card-color)}
+  .ghc-title{font-family:var(--font-body);font-size:15px;font-weight:800;color:var(--card-color);letter-spacing:0.5px}
+
+  .ghc-body{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;margin-bottom:24px;position:relative}
+  .ghc-left-col{flex:1;display:flex;flex-direction:column;gap:16px;z-index:2}
+  .ghc-jockey-block{display:flex;align-items:center;gap:14px}
+  .ghc-portrait{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,0.1);background:#000;box-shadow:0 4px 12px rgba(0,0,0,0.2)}
+  .ghc-jockey-meta{display:flex;flex-direction:column;gap:2px}
+  .ghc-jname{font-family:var(--font-ui);font-size:13px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+  .ghc-odds-display{display:flex;flex-direction:column}
+  .ghc-odds-num{font-family:var(--font-display);font-size:32px;font-weight:900;color:var(--gold-light);line-height:1}
+  .ghc-odds-lbl{font-family:var(--font-ui);font-size:9px;font-weight:800;color:var(--text-muted);letter-spacing:1.5px;margin-top:2px}
+
+  .ghc-form-row{display:flex;gap:6px}
+  .ghc-form-pill{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:18px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+  .ghc-form-pill.W{background:#10b981}.ghc-form-pill.P{background:#f59e0b}.ghc-form-pill.L{background:#ef4444}
+
+  .ghc-horse-side{flex:1.2;display:flex;justify-content:flex-end;align-items:center;position:relative;z-index:1}
+  .ghc-horse-side img{transform:scale(2.0) translateX(-15px);filter:hue-rotate(var(--horse-hue, 0deg)) drop-shadow(0 10px 20px rgba(0,0,0,0.5));opacity:0.95}
+
+  .ghc-footer{border-top:1px solid rgba(255,255,255,0.06);padding-top:16px;display:flex;flex-direction:column;gap:10px;margin-top:auto}
+  .ghc-stat-bar-row{display:flex;align-items:center;gap:12px}
+  .ghc-stat-name{width:32px;font-family:var(--font-ui);font-size:12px;font-weight:800;color:var(--text-muted);letter-spacing:0.5px}
+  .ghc-stat-track{flex:1;height:6px;background:rgba(255,255,255,0.05);border-radius:10px;overflow:hidden}
+  .ghc-stat-fill{height:100%;border-radius:10px;background:linear-gradient(90deg, var(--gold-dim), var(--gold-light))}
+  .ghc-stat-val{width:22px;font-family:var(--font-ui);font-size:13px;font-weight:800;color:#fff;text-align:right}
+
+  .ghc-lock-status{position:absolute;top:20px;right:20px;font-family:var(--font-display);font-size:12px;font-weight:900;padding:4px 10px;border-radius:6px;letter-spacing:1px}
+  .ghc-lock-status.confirmed{color:#00ff88;background:rgba(0,255,136,0.1)}
+  .ghc-lock-status.selected{color:var(--gold);background:rgba(201,162,39,0.1)}
+
+
+
   .ghc-odds-label{font-size:10px;color:var(--text-muted);font-family:var(--font-ui);letter-spacing:1.5px;text-transform:uppercase;margin-top:2px}
   .ghc-jockey{font-size:12px;color:var(--text-muted);margin-top:6px;font-family:var(--font-body)}
   .ghc-form{display:inline-flex;gap:3px;margin-top:6px}
@@ -1383,7 +1417,7 @@ function buildRaceScreenHTML() {
 
   /* ── Tablet ── */
   @media(min-width:768px){
-    .game-cards-grid{grid-template-columns:repeat(3,1fr);gap:12px}
+    .game-cards-grid{grid-template-columns:repeat(2,1fr);gap:20px}
     .game-section{padding:0 20px}
     .game-track-area{padding:18px 20px 12px}
     .game-instruction{padding:12px 24px}
@@ -1392,7 +1426,6 @@ function buildRaceScreenHTML() {
     .race-info-cell:last-child{border-right:none}
     .ric-val{font-size:16px}
     .ric-label{font-size:10px;letter-spacing:2px}
-    .ghc-name{font-size:15px}
     .game-result-banner{margin:12px 20px;padding:24px;border-radius:14px;width:auto;border:1.5px solid transparent}
     .game-result-banner.win{background:linear-gradient(135deg,#0a2e0a,#1a551a);border-color:#00ff88}
     .game-result-banner.lose{background:linear-gradient(135deg,#2e0a0a,#5a1a1a);border-color:#ff4444}
@@ -1439,8 +1472,8 @@ function buildRaceScreenHTML() {
     .game-side-panel{border-top:none}
 
     .ghc-odds{font-size:26px}
-    .game-cards-grid{gap:8px;padding:0 0 8px}
-    .game-horse-card{padding:10px}
+    .game-cards-grid{gap:12px;padding:0 0 12px}
+    .game-horse-card{padding:16px}
     .game-section-header{padding:12px 0 8px;margin-bottom:8px}
     .game-track-area{padding:12px 16px 8px}
     .game-payout-preview{margin:0 16px 8px;padding:10px 16px}
@@ -1456,8 +1489,8 @@ function buildRaceScreenHTML() {
     .howto-text{font-size:13px}
     .game-bet-bar{padding:20px 24px}
     .ghc-odds{font-size:26px}
-    .game-cards-grid{gap:8px;padding:0 0 8px}
-    .game-horse-card{padding:10px}
+    .game-cards-grid{grid-template-columns:repeat(3,1fr);gap:16px;padding:0 0 16px}
+    .game-horse-card{padding:20px}
     .game-section-header{padding:12px 0 8px;margin-bottom:8px}
     .game-track-area{padding:12px 16px 8px;position:relative}
     .game-payout-preview{margin:0 16px 8px;padding:10px 16px}
@@ -1509,6 +1542,7 @@ function initRaceGame() {
   gamePhase = "betting";
   bettingTimerSecs = 30;
   isBetConfirmed = false;
+  gameSetHorsesRunning(false);
   
   const timerBadge = document.getElementById("gameTimerBadge");
   if (timerBadge) {
@@ -1592,12 +1626,12 @@ function tickBettingTimer() {
     if (isMultiplayer) {
       // MULTIPLAYER: Ensure at least 2 players are present and BOTH confirmed.
       // If only 1 player is there, the race won't start automatically.
-      const everyoneConfirmed = presentPlayers.length >= 2 && presentPlayers.every(p => p.betConfirmed);
+      const everyoneConfirmed = presentPlayers.length >= 1 && presentPlayers.every(p => p.betConfirmed);
       allPlayersReady = everyoneConfirmed;
       
       // If timer hits 0, only start if we have at least 2 players and they confirmed.
       // This enforces the "only starts when both confirm" rule.
-      if (presentPlayers.length < 2 || !presentPlayers.every(p => p.betConfirmed)) {
+      if (presentPlayers.length > 1 && !presentPlayers.every(p => p.betConfirmed)) {
         canStartIfTimerZero = false;
         if (remaining <= 0 && timerLbl) {
           timerLbl.textContent = "WAITING FOR OTHERS...";
@@ -1608,7 +1642,7 @@ function tickBettingTimer() {
       // Sample game / Single player: timer-based, always allowed to start when timer hits 0
       canStartIfTimerZero = true;
       // Check if the current player has confirmed their bet
-      if (isBetConfirmed) {
+      if (isBetConfirmed && gameRoomBets.every(b => b.readyAt !== undefined ? (30 - bettingTimerSecs) >= b.readyAt : true)) {
         allPlayersReady = true;
       }
     }
@@ -1686,23 +1720,74 @@ function buildGameBettingPanel() {
     card.id = "gcard" + i;
     card.style.setProperty("--card-color", h.color);
     card.onclick = () => gameSelectHorse(i);
-    const formBadges = h.form.map(f => `<span class="ghc-fd ${f}">${f}</span>`).join("");
+    const formBadges = h.form.map(f => `<span class="ghc-form-pill ${f}">${f}</span>`).join("");
+    const jockeyPortrait = `jockey_portrait_premium.png`; 
     card.innerHTML = `
-      <div class="ghc-header"><div class="ghc-dot" style="background:${h.color}"></div><div class="ghc-name">#${i+1} ${h.name}</div></div>
-      <div class="ghc-odds">${h.odds.toFixed(1)}x</div>
-      <div class="ghc-odds-label">ODDS TO WIN</div>
-      <div class="ghc-jockey">🧑 ${h.jockey}</div>
-      <div class="ghc-form">${formBadges}</div>
-      <div class="ghc-stat"><div class="ghc-slabel">Spd</div><div class="ghc-strack"><div class="ghc-sfill" style="width:${h.speed}%"></div></div><span style="font-size:9px;color:#446644;width:20px;text-align:right">${h.speed}</span></div>
-      <div class="ghc-stat"><div class="ghc-slabel">Stm</div><div class="ghc-strack"><div class="ghc-sfill" style="width:${h.stamina}%;background:linear-gradient(90deg,#1a6a4a,#00ccff)"></div></div><span style="font-size:9px;color:#446644;width:20px;text-align:right">${h.stamina}</span></div>`;
+      <div class="ghc-head">
+        <div class="ghc-dot"></div>
+        <div class="ghc-title">#${i+1} ${h.name.toUpperCase()}</div>
+      </div>
+      
+      <div class="ghc-body">
+        <div class="ghc-left-col">
+          <div class="ghc-jockey-block">
+            <img src="${jockeyPortrait}" class="ghc-portrait" alt="Jockey">
+            <div class="ghc-jockey-meta">
+              <div class="ghc-jname">${h.jockey}</div>
+              <div class="ghc-odds-display">
+                <span class="ghc-odds-num">${h.odds.toFixed(1)}X</span>
+                <span class="ghc-odds-lbl">ODDS TO WIN</span>
+              </div>
+            </div>
+          </div>
+          <div class="ghc-form-row">
+            ${formBadges}
+          </div>
+        </div>
+        
+        <div class="ghc-horse-side">
+          ${buildHorseSVG(h.color, i)}
+        </div>
+      </div>
+
+
+
+
+      <div class="ghc-footer">
+        <div class="ghc-stat-bar-row">
+          <span class="ghc-stat-name">SPD</span>
+          <div class="ghc-stat-track"><div class="ghc-stat-fill" style="width:${h.speed}%"></div></div>
+          <span class="ghc-stat-val">${h.speed}</span>
+        </div>
+        <div class="ghc-stat-bar-row">
+          <span class="ghc-stat-name">STM</span>
+          <div class="ghc-stat-track"><div class="ghc-stat-fill" style="width:${h.stamina}%; background:linear-gradient(90deg, #b5803a, #d4a04e)"></div></div>
+          <span class="ghc-stat-val">${h.stamina}</span>
+        </div>
+      </div>
+      <div class="ghc-lock-status" id="lockStatus${i}"></div>
+`;
     panel.appendChild(card);
   });
 }
 
 function gameSelectHorse(i) {
-  if (gameRacing) return;
+  if (gameRacing || isBetConfirmed) return;
   gameSelectedHorse = i;
-  document.querySelectorAll(".game-horse-card").forEach((c, idx) => c.classList.toggle("selected", idx === i));
+  document.querySelectorAll(".game-horse-card").forEach((c, idx) => {
+    const isSel = (idx === i);
+    c.classList.toggle("selected", isSel);
+    const status = document.getElementById("lockStatus" + idx);
+    if (status) {
+      if (isSel) {
+        status.textContent = "SELECTED";
+        status.className = "ghc-lock-status selected";
+      } else {
+        status.textContent = "";
+        status.className = "ghc-lock-status";
+      }
+    }
+  });
   document.getElementById("gameRaceStatus").textContent = "Selected: #" + (i+1) + " " + horses[i].name;
   const btn = document.getElementById("gameRaceBtn");
   if (btn) btn.disabled = false;
@@ -1751,6 +1836,12 @@ function gameStartRace() {
     const selectedCard = document.getElementById("gcard" + gameSelectedHorse);
     if (selectedCard) selectedCard.classList.add("confirmed");
     
+    const status = document.getElementById("lockStatus" + gameSelectedHorse);
+    if (status) {
+      status.textContent = "LOCKED";
+      status.className = "ghc-lock-status confirmed";
+    }
+    
     // Sync to Firebase if in multiplayer
     if (activeRoom && activeRoom.code) {
       updatePlayerBetInFirebase(activeRoom.code, playerId, gameSelectedHorse, betAmt);
@@ -1792,6 +1883,38 @@ function startRaceCountdown(betAmt) {
   }, 1000);
 }
 
+function gameSetHorsesRunning(running) {
+  const targets = document.querySelectorAll('.horse-img, .loading-horse-runner img, .bg-gif');
+  targets.forEach(img => {
+    if (running) {
+      if (img.dataset.originalSrc) {
+        img.src = img.dataset.originalSrc;
+        img.dataset.originalSrc = "";
+      }
+    } else {
+      const freeze = () => {
+        if (img.src.startsWith('data:')) return;
+        if (!img.dataset.originalSrc) img.dataset.originalSrc = img.src;
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth || img.width;
+          canvas.height = img.naturalHeight || img.height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          img.src = canvas.toDataURL('image/png');
+        } catch (e) {
+          console.warn("Freeze failed", e);
+        }
+      };
+      if (img.complete && img.naturalWidth > 0) {
+        freeze();
+      } else {
+        img.onload = freeze;
+      }
+    }
+  });
+}
+
 function executeRace(betAmt) {
   // Sync physics seed with the room's global seed
   if (activeRoom && activeRoom.raceSeed) {
@@ -1800,6 +1923,7 @@ function executeRace(betAmt) {
 
   balance -= betAmt;
   gameRacing = true;
+  gameSetHorsesRunning(true);
   raceCount++;
   document.getElementById("gameRaceBtn").disabled = true;
   document.getElementById("gameResultBanner").style.display = "none";
@@ -1854,6 +1978,7 @@ function gameAnimateLegs(i, tick) {
 
 function gameEndRace(winner, betAmt) {
   gameRacing = false;
+  gameSetHorsesRunning(false);
   document.getElementById("gameRaceStatus").classList.remove("pulse");
   document.getElementById("gameRaceStatus").textContent = "Race Finished!";
 
@@ -2072,6 +2197,11 @@ function gameRenderHistory() {
 
 // ── SVG HORSE BUILDER ────────────────────────────────────────
 function buildHorseSVG(color, idx) {
+  const hueRotate = idx * 60; 
+  return `<img class="horse-img" src="assets/horse.gif" width="120" height="70" style="display:block; --horse-hue:${hueRotate}deg" onload="if(!gameRacing) gameSetHorsesRunning(false)">`;
+}
+/*
+function buildHorseSVG_old(color, idx) {
   const dark = darken(color);
   return `<svg viewBox="0 0 72 40" xmlns="http://www.w3.org/2000/svg" width="58" height="34" style="display:block">
     <ellipse cx="34" cy="22" rx="20" ry="10" fill="${color}" opacity="0.95"/>
@@ -2093,6 +2223,7 @@ function buildHorseSVG(color, idx) {
     <rect id="l3-${idx}" x="45" y="30" width="5" height="9" rx="2" fill="${dark}"/>
   </svg>`;
 }
+*/
 
 // ── CHECK FOR INVITE CODE IN URL ─────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
