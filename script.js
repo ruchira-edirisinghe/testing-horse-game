@@ -269,7 +269,7 @@ function performGoBack() {
 
   // POPUP SCREENS: lock body scroll and keep page at top to prevent upward drift
   const POPUP_SCREENS = ["screen-create", "screen-rooms"];
-  if (POPUP_SCREENS.includes(id)) {
+  if (POPUP_SCREENS.includes(prev)) {
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
     window.scrollTo(0, 0);
@@ -984,18 +984,17 @@ function showRaceGame() {
 
 function gameGenerateAIBets() {
   if (!activeRoom || !activeRoom.players) return;
-  const otherPlayers = activeRoom.players.filter(p => p !== "You"); // assume 'You' is not in the list or handle
-  // For this sim, we'll use the players list from the room, minus the host if the host is 'You'
-  // Actually, PUBLIC_ROOMS players usually doesn't include 'You' until we 'join'.
+  // Filter out the current player — only generate bets for AI/other players
+  const otherPlayers = activeRoom.players.filter(p => p !== playerName);
   
-  activeRoom.players.forEach(p => {
+  otherPlayers.forEach(p => {
     // 80% chance for each AI player to place a bet
     if (Math.random() < 0.8) {
       const hIdx = Math.floor(Math.random() * horses.length);
       const amt = (Math.floor(Math.random() * 5) + 1) * 20; // 20, 40, 60, 80, 100
       // Simulate "thinking" time by setting a readyAt second (0-20s in)
       const readyAt = Math.floor(Math.random() * 20) + 1;
-      gameRoomBets.push({ player: p, horseIndex: hIdx, amount: amt, readyAt });
+      gameRoomBets.push({ player: p, horseIndex: hIdx, amount: amt, readyAt, betConfirmed: true });
     }
   });
 }
@@ -1545,15 +1544,18 @@ function tickBettingTimer() {
   let now = Date.now();
   let remaining = 0;
   let hasValidTimer = false;
+  const isSampleGame = activeRoom && activeRoom.isSampleGame;
+  const isMultiplayer = activeRoom && activeRoom.code && !isSampleGame;
 
   if (activeRoom && activeRoom.bettingEndTime) {
     remaining = Math.max(0, Math.ceil((activeRoom.bettingEndTime - now) / 1000));
     hasValidTimer = true;
   } else {
-    // Fallback if room data hasn't loaded yet
+    // Fallback for sample game / non-Firebase rooms: use local countdown
     remaining = bettingTimerSecs;
     if (remaining > 0) bettingTimerSecs--;
-    hasValidTimer = false;
+    // For sample games, the local timer IS valid
+    hasValidTimer = isSampleGame || !isMultiplayer;
   }
   
   const timerCell = document.getElementById("gameHeaderTimerCell");
@@ -1581,9 +1583,13 @@ function tickBettingTimer() {
 
   if (activeRoom && activeRoom.playerList) {
     const presence = activeRoom.presence || {};
-    const presentPlayers = activeRoom.playerList.filter(p => presence[p.id]);
+    const hasPresenceData = Object.keys(presence).length > 0;
+    // For sample games/non-multiplayer, treat all players as present
+    const presentPlayers = hasPresenceData
+      ? activeRoom.playerList.filter(p => presence[p.id])
+      : activeRoom.playerList;
     
-    if (activeRoom.code) {
+    if (isMultiplayer) {
       // MULTIPLAYER: Ensure at least 2 players are present and BOTH confirmed.
       // If only 1 player is there, the race won't start automatically.
       const everyoneConfirmed = presentPlayers.length >= 2 && presentPlayers.every(p => p.betConfirmed);
@@ -1599,9 +1605,11 @@ function tickBettingTimer() {
         }
       }
     } else {
-      // Single player / Public fallback
-      if (presentPlayers.length > 0) {
-        allPlayersReady = presentPlayers.every(p => p.betConfirmed);
+      // Sample game / Single player: timer-based, always allowed to start when timer hits 0
+      canStartIfTimerZero = true;
+      // Check if the current player has confirmed their bet
+      if (isBetConfirmed) {
+        allPlayersReady = true;
       }
     }
   }
@@ -1990,7 +1998,16 @@ function gameResetForNextRace(isFromHostUpdate = false) {
   if (banner) banner.style.display = "none";
   if (module) module.style.display = "flex";
 
-  initRaceGame(); // Re-init everything (timer, AI bets, etc)
+  gameRoomBets = []; // Reset bets for the new round
+  initRaceGame(); // Re-init everything (timer, etc)
+  
+  // Regenerate AI bets for sample/non-multiplayer games
+  if (activeRoom && activeRoom.isSampleGame) {
+    gameGenerateAIBets();
+  } else if (!activeRoom || !activeRoom.code) {
+    gameGenerateAIBets();
+  }
+  gameRenderLiveBets();
 }
 
 function gameUpdateBalance() {
@@ -2007,8 +2024,11 @@ function gameUpdateBalance() {
 }
 
 function gameClearHistory() {
-  gameHistory = [];
+  history = [];
   gameRenderHistory();
+  // Show empty state
+  const list = document.getElementById("gameHistoryList");
+  if (list) list.innerHTML = '<span class="ghs-empty">No races yet — place your first bet!</span>';
 }
 
 function gameRenderHistory() {

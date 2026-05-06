@@ -2555,3 +2555,84 @@ input:checked + .toggle-slider:before {
 .btn-toggle-password:hover {
   color: var(--gold) !important;
 }
+
+/* -----------------------------------------------------------------------------
+   MOBILE UI FIXES
+   ----------------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  /* Center the main content on mobile */
+  #screen-home.active {
+    padding-left: 0 !important;
+  }
+  .home-main-content {
+    flex: 1 !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 0 20px !important;
+    margin-top: -60px !important; /* visual adjustment to center perfectly */
+    gap: 24px !important; /* Tighter gap between logo and buttons */
+  }
+  .home-hero {
+    flex: 0 0 auto !important; /* Stop logo from pushing buttons down */
+    min-height: auto !important;
+    padding: 0 !important;
+  }
+  .logo-horizontal-main {
+    margin-left: 0 !important;
+    max-width: 340px !important; /* Made logo bigger */
+    width: 100% !important;
+  }
+  .new-home-actions {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    align-items: center !important;
+    gap: 12px !important;
+  }
+  .btn-capsule {
+    width: 100% !important;
+    max-width: 300px !important;
+  }
+  
+  /* Fix header layout on mobile */
+  .home-top-bar {
+    padding: 15px 12px !important;
+    flex-wrap: wrap !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+  }
+  .top-bar-right {
+    gap: 6px !important;
+    flex-wrap: wrap !important;
+    justify-content: flex-end !important;
+  }
+  
+  /* Make header elements slightly smaller to fit */
+  .btn-back {
+    padding: 6px 12px !important;
+    font-size: 13px !important;
+  }
+  .credits-badge {
+    padding: 6px 10px !important;
+  }
+  .credits-num {
+    font-size: 14px !important;
+  }
+  .avatar-chip {
+    padding: 4px 6px 4px 12px !important;
+    gap: 8px !important;
+  }
+  #playerNameBadge {
+    font-size: 10px !important;
+  }
+  .avatar-inner {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+  .btn-mute {
+    width: 36px !important;
+    height: 36px !important;
+  }
+}
