@@ -43,11 +43,11 @@ function submitPlayerName() {
   setPlayerName(name);
   playerNameError.textContent = '';
   
-  // Update UI with player name
-  document.getElementById('playerBadge').style.display = 'flex';
-  document.getElementById('playerNameBadge').textContent = name;
+  // Update UI with player name (all instances)
+  document.querySelectorAll('.player-badge').forEach(el => el.style.display = 'flex');
+  document.querySelectorAll('.player-name-badge').forEach(el => el.textContent = name);
   const initials = name.slice(0, 2).toUpperCase();
-  document.getElementById('playerAvatar').textContent = initials;
+  document.querySelectorAll('.player-avatar').forEach(el => el.textContent = initials);
   
   // Close modal
   closePlayerNameModal();
@@ -1030,9 +1030,30 @@ function buildRaceScreenHTML() {
     <img src="assets/logo-horizontal.png" alt="Horse Racing Elite" class="logo-horizontal"
          onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
     <div class="hlogo-fallback" style="display:none; align-items:center; gap:5px"><img src="assets/horse.gif" width="24" height="15" style="transform: scaleX(-1)"> ELITE</div>
-    <div class="credits-badge">
-      <span class="credits-num" id="gameBalanceDisplay">0</span>
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="13" height="13" rx="2.5" stroke="#c9a227" stroke-width="1.4"/><path d="M5 8h6M8 5v6" stroke="#c9a227" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <div class="top-bar-right">
+      <button class="btn-mute ${musicPlaying ? '' : 'is-muted'}" onclick="toggleMusic()">
+        <svg class="muteIconSvg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path class="volumePath" d="M11 5L6 9H2v6h4l5 4V5z"></path>
+          <path class="vibe-path vibePath1" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+          <path class="vibe-path vibePath2" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+          <line class="muteLine" x1="1" y1="1" x2="23" y2="23" style="${musicPlaying ? 'display:none' : 'display:block'}"></line>
+        </svg>
+      </button>
+      <div class="credits-badge">
+        <span class="credits-num">${balance.toLocaleString()}</span>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#c9a227" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"></path>
+          <path d="M4 6v12c0 1.1.9 2 2 2h14v-4"></path>
+          <path d="M18 12a2 2 0 0 0-2 2c0 1.1.9 2 2 2h4v-4h-4z"></path>
+        </svg>
+      </div>
+      <div class="avatar-chip">
+        <div class="player-badge" style="display: ${playerName ? 'flex' : 'none'}">
+          <span class="player-name-badge">${playerName || 'Anonymous'}</span>
+        </div>
+        <div class="avatar-inner player-avatar">${(playerName || '👤').slice(0,2).toUpperCase()}</div>
+        <div class="avatar-online-dot"></div>
+      </div>
     </div>
   </div>
 
@@ -2391,9 +2412,13 @@ const maxVolume = 0.15;
 function toggleMusic() {
   if (!bgMusic || isFading) return;
   
+  const muteBtns = document.querySelectorAll(".btn-mute");
+  const muteLines = document.querySelectorAll(".muteLine");
+  
   if (musicPlaying) {
     isFading = true;
-    if (btnMute) btnMute.classList.add("is-muted"); // Update UI immediately
+    muteBtns.forEach(btn => btn.classList.add("is-muted"));
+    muteLines.forEach(line => line.style.display = "block");
     fadeOut(bgMusic, 600, () => {
       bgMusic.pause();
       musicPlaying = false;
@@ -2401,7 +2426,8 @@ function toggleMusic() {
     });
   } else {
     isFading = true;
-    if (btnMute) btnMute.classList.remove("is-muted"); // Update UI immediately
+    muteBtns.forEach(btn => btn.classList.remove("is-muted"));
+    muteLines.forEach(line => line.style.display = "none");
     bgMusic.play().then(() => {
       fadeIn(bgMusic, 600, () => {
         musicPlaying = true;
