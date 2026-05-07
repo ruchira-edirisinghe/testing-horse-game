@@ -1103,15 +1103,15 @@ function buildRaceScreenHTML() {
           <div class="howto-steps">
             <div class="howto-step">
               <span class="howto-num">1</span>
-              <div class="howto-text"><strong>Select a Horse</strong><br>Tap a horse card to choose your contender. Study the odds and recent form.</div>
+              <div class="howto-text"><strong>Select a Horse</strong>Tap a horse card to choose your contender. Study the odds and recent form.</div>
             </div>
             <div class="howto-step">
               <span class="howto-num">2</span>
-              <div class="howto-text"><strong>Place Your Bet</strong><br>Set your wager below. Quick-bet buttons for $25, $50, $100 or ALL IN.</div>
+              <div class="howto-text"><strong>Place Your Bet</strong>Set your wager below. Quick-bet buttons for $25, $50, $100 or ALL IN.</div>
             </div>
             <div class="howto-step">
               <span class="howto-num">3</span>
-              <div class="howto-text"><strong>Confirm Bet</strong><br>Wait for the timer or hit confirm. The race starts automatically!</div>
+              <div class="howto-text"><strong>Confirm Bet</strong>Wait for the timer or hit confirm. The race starts automatically!</div>
             </div>
           </div>
           <div class="howto-tip">
@@ -1405,15 +1405,18 @@ function buildRaceScreenHTML() {
   .game-col-right{display:flex;flex-direction:column;gap:0}
 
   /* ── How to Play Panel ── */
-  .game-howto-panel{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:16px}
-  .howto-title{font-family:var(--font-display);font-size:20px;letter-spacing:2px;color:var(--text-primary);display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .game-howto-panel{background:rgba(22,25,34,0.4);border:1px solid rgba(201,162,39,0.1);border-radius:16px;padding:20px;margin:16px;backdrop-filter:blur(10px);box-shadow:0 8px 32px rgba(0,0,0,0.3);position:relative;overflow:hidden}
+  .game-howto-panel::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:linear-gradient(to bottom, var(--gold-dim), var(--gold));opacity:0.4}
+  .howto-title{font-family:var(--font-display);font-size:16px;letter-spacing:2px;color:var(--text-primary);display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid rgba(201,162,39,0.15);text-transform:uppercase}
+  .howto-title svg{color:var(--gold);width:18px;height:18px}
   .howto-steps{display:flex;flex-direction:column;gap:12px}
-  .howto-step{display:flex;gap:10px;align-items:flex-start}
-  .howto-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold-dim),var(--gold));color:#0a0e18;font-family:var(--font-display);font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-  .howto-text{font-family:var(--font-body);font-size:12px;color:var(--text-muted);line-height:1.5}
-  .howto-text strong{color:var(--text-primary);font-family:var(--font-ui);font-weight:700;font-size:12px}
-  .howto-tip{margin-top:14px;padding:10px 12px;background:rgba(201,162,39,0.06);border:1px solid rgba(201,162,39,0.15);border-radius:8px;font-family:var(--font-body);font-size:11px;color:var(--gold);display:flex;align-items:flex-start;gap:8px;line-height:1.5}
-  .howto-tip em{color:var(--text-muted)}
+  .howto-step{display:flex;gap:12px;align-items:flex-start}
+  .howto-num{width:24px;height:24px;border-radius:6px;background:rgba(201,162,39,0.1);border:1px solid rgba(201,162,39,0.2);color:var(--gold);font-family:var(--font-display);font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .howto-text{font-family:var(--font-body);font-size:12px;color:var(--text-muted);line-height:1.4}
+  .howto-text strong{color:var(--gold-light);font-family:var(--font-ui);font-weight:800;font-size:12px;margin-right:8px}
+  .howto-tip{margin-top:16px;padding:12px 14px;background:rgba(201,162,39,0.03);border:1px solid rgba(201,162,39,0.1);border-radius:10px;font-family:var(--font-body);font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:8px;line-height:1.4}
+  .howto-tip span{font-size:13px;opacity:0.8}
+  .howto-tip em{color:var(--gold-light);font-style:normal}
 
   /* ── Tablet ── */
   @media(min-width:768px){
@@ -1461,12 +1464,12 @@ function buildRaceScreenHTML() {
 
     .game-result-banner{margin:0;width:100%}
 
-    .game-howto-panel{margin:24px 16px 0;padding:22px}
-    .howto-title{font-size:18px;margin-bottom:12px;padding-bottom:10px}
-    .howto-steps{gap:10px}
-    .howto-num{width:24px;height:24px;font-size:13px}
+    .game-howto-panel{margin:20px 16px;padding:20px}
+    .howto-title{font-size:16px;margin-bottom:12px;padding-bottom:10px}
+    .howto-steps{gap:12px}
+    .howto-num{width:24px;height:24px;font-size:12px}
     .howto-text{font-size:12px}
-    .howto-tip{font-size:11px}
+    .howto-tip{font-size:11px;margin-top:14px}
 
     .game-history-strip{padding:14px 16px;border-top:none;flex-shrink:0}
     .game-side-panel{border-top:none}
@@ -1484,9 +1487,10 @@ function buildRaceScreenHTML() {
   @media(min-width:1200px){
     .game-col-right{min-width:380px;flex:0.75}
     .game-col-left{flex:1.25}
-    .game-howto-panel{margin:20px 20px 0;padding:22px}
-    .howto-title{font-size:20px}
+    .game-howto-panel{margin:20px 20px;padding:24px}
+    .howto-title{font-size:18px;margin-bottom:16px}
     .howto-text{font-size:13px}
+    .howto-steps{gap:14px}
     .game-bet-bar{padding:20px 24px}
     .ghc-odds{font-size:26px}
     .game-cards-grid{grid-template-columns:repeat(3,1fr);gap:16px;padding:0 0 16px}
@@ -1848,6 +1852,17 @@ function gameStartRace() {
     }
 
     gameRenderLiveBets();
+
+    // NEW: For Sample Game, start immediately!
+    if (activeRoom && activeRoom.isSampleGame) {
+      if (bettingInterval) clearInterval(bettingInterval);
+      gamePhase = "countdown";
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "RACING...";
+      }
+      startRaceCountdown(betAmt);
+    }
     return;
   }
 }
