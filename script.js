@@ -1219,7 +1219,7 @@ function buildRaceScreenHTML() {
   .game-section-hint.pulse{animation:gpulse 0.8s ease infinite alternate}
   @keyframes gpulse{from{box-shadow:none;color:var(--text-muted)}to{color:var(--gold);text-shadow:0 0 8px rgba(201,162,39,0.4)}}
 
-  .horse-img{filter: hue-rotate(var(--horse-hue, 0deg)); transition: filter 0.3s ease}
+  .horse-img{filter: hue-rotate(var(--horse-hue, 0deg)); transition: filter 0.3s ease; width: 90px; height: auto}
 
   /* ── Horse Cards Grid ── */
   .game-cards-grid{display:grid;grid-template-columns:repeat(1,1fr);gap:20px;padding:0 20px 20px}
@@ -1248,8 +1248,8 @@ function buildRaceScreenHTML() {
   .ghc-odds-num{font-family:var(--font-display);font-size:32px;font-weight:900;color:var(--gold-light);line-height:1}
   .ghc-odds-lbl{font-family:var(--font-ui);font-size:9px;font-weight:800;color:var(--text-muted);letter-spacing:1.5px;margin-top:2px}
 
-  .ghc-form-row{display:flex;gap:6px}
-  .ghc-form-pill{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:18px;font-weight:900;color:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.2)}
+  .ghc-form-row{display:flex;gap:4px}
+  .ghc-form-pill{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-family:var(--font-display);font-size:13px;font-weight:900;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.2)}
   .ghc-form-pill.W{background:#10b981}.ghc-form-pill.P{background:#f59e0b}.ghc-form-pill.L{background:#ef4444}
 
   .ghc-horse-side{flex:1.2;display:flex;justify-content:flex-end;align-items:center;position:relative;z-index:1}
@@ -2198,7 +2198,7 @@ function gameRenderHistory() {
 // ── SVG HORSE BUILDER ────────────────────────────────────────
 function buildHorseSVG(color, idx) {
   const hueRotate = idx * 60; 
-  return `<img class="horse-img" src="assets/horse.gif" width="120" height="70" style="display:block; --horse-hue:${hueRotate}deg" onload="if(!gameRacing) gameSetHorsesRunning(false)">`;
+  return `<img class="horse-img" src="assets/horse.gif" width="90" height="70" style="display:block; --horse-hue:${hueRotate}deg" onload="if(!gameRacing) gameSetHorsesRunning(false)">`;
 }
 /*
 function buildHorseSVG_old(color, idx) {
