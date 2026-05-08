@@ -512,47 +512,61 @@ function _paintLobby(room) {
   const isRanked      = room.tag  === "ranked";
   const isMultiplayer = !!room.code;
 
-  const lockIcon = `<svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="4" y="10" width="14" height="9" rx="2" stroke="#6b7399" stroke-width="1.5"/><path d="M7 10V8a4 4 0 018 0v2" stroke="#6b7399" stroke-width="1.5" stroke-linecap="round"/></svg>`;
-  const gameIcon = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="3.5" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5"/><path d="M8 12h3M9.5 10.5v3" stroke="${isRanked ? '#c9a227' : '#e8be45'}" stroke-width="1.5" stroke-linecap="round"/><circle cx="16" cy="12" r="1.5" fill="${isRanked ? '#c9a227' : '#e8be45'}"/></svg>`;
+  // Premium Icons
+  const icons = {
+    lock: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`,
+    game: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"></rect><path d="M6 12h4M8 10v4M15 13a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"></path></svg>`,
+    track: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>`,
+    distance: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"></path></svg>`,
+    stake: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>`,
+    capacity: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`,
+    password: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`
+  };
+
   const tagBadge    = `<span class="room-tag ${isPrivate ? 'private' : isRanked ? 'ranked' : 'fast'}">${room.tagLabel}</span>`;
-  const codeDisplay = isMultiplayer ? `<div class="lobby-room-code"><strong>CODE:</strong> ${room.code}</div>` : '';
+  const codeDisplay = isMultiplayer ? `<div class="lobby-room-code" style="margin-top:8px; font-family:var(--font-ui); font-size:14px; color:var(--gold-light); letter-spacing:1px"><strong>CODE:</strong> <span style="background:rgba(201,162,39,0.1); padding:2px 8px; border-radius:4px; border:1px solid rgba(201,162,39,0.2)">${room.code}</span></div>` : '';
 
   document.getElementById("lobbyBanner").innerHTML = `
-    <div class="lobby-room-icon-wrap">${isPrivate ? lockIcon : gameIcon}</div>
+    <div class="lobby-room-icon-wrap" style="color:${isRanked ? 'var(--gold)' : 'var(--gold-light)'}">${isPrivate ? icons.lock : icons.game}</div>
     <div style="flex:1;min-width:0">
       <div class="lobby-room-title">${room.name}</div>
       <div class="lobby-room-host">Hosted by <strong style="color:var(--text-primary)">${room.host}</strong></div>
-      <div class="lobby-room-badges" style="margin-top:5px">${tagBadge}</div>
+      <div class="lobby-room-badges">${tagBadge}</div>
       ${codeDisplay}
     </div>
     <div class="lobby-actions">
-      ${room.isSampleGame ? '' : `<button class="btn-lobby-invite" onclick="openInviteModal()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
+      ${room.isSampleGame ? '' : `<button class="btn-lobby-invite btn-capsule btn-gold small" onclick="openInviteModal()" style="padding: 8px 16px; font-size: 13px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:6px"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M20 8v6M23 11h-6"/></svg>
         INVITE FRIENDS
       </button>`}
     </div>`;
 
   document.getElementById("lobbyDetails").innerHTML = `
     <div class="detail-cell">
+      <div class="detail-icon-wrap">${icons.track}</div>
       <div class="detail-label">Track</div>
       <div class="detail-value">${room.track}</div>
     </div>
     <div class="detail-cell">
+      <div class="detail-icon-wrap">${icons.distance}</div>
       <div class="detail-label">Distance</div>
       <div class="detail-value teal">${room.distance}</div>
     </div>
     <div class="detail-cell">
+      <div class="detail-icon-wrap">${icons.stake}</div>
       <div class="detail-label">Stake</div>
       <div class="detail-value gold">${room.stake} 🪙</div>
     </div>
     <div class="detail-cell">
+      <div class="detail-icon-wrap">${icons.capacity}</div>
       <div class="detail-label">Capacity</div>
       <div class="detail-value">${(room.players||[]).length} / ${room.maxPlayers}</div>
     </div>
-    <div class="detail-cell" style="grid-column:1/-1">
-      <div class="detail-label">Password</div>
-      <div class="detail-value password-cell" style="display:flex;align-items:center;gap:8px;font-size:14px">
-        <span style="color:var(--gold-light)">Open Access</span>
+    <div class="detail-cell" style="grid-column: 1 / -1;">
+      <div class="detail-icon-wrap">${icons.password}</div>
+      <div class="detail-label">Access Control</div>
+      <div class="detail-value" style="display:flex;align-items:center;gap:8px;font-size:14px">
+        <span style="color:var(--gold-light)">${isPrivate ? 'Private Arena (Password Protected)' : 'Open Access'}</span>
       </div>
     </div>`;
 
@@ -574,9 +588,11 @@ function _paintLobby(room) {
     row.style.animationDelay = (i * 80) + "ms";
     row.innerHTML = `
       <div class="player-avatar ${isHost ? 'host-avatar' : ''} ${isCurrentPlayer ? 'current-player' : ''}">${initials}</div>
-      <div class="player-name">${player.name}${isCurrentPlayer ? ' <span style="opacity:.6">(You)</span>' : ''}</div>
-      ${isHost ? '<span class="player-host-badge">HOST</span>' : ''}
-      <span class="player-ready-badge">READY</span>`;
+      <div class="player-name">${player.name}${isCurrentPlayer ? ' <span style="opacity:.6; font-size:12px; margin-left:4px">(You)</span>' : ''}</div>
+      <div class="player-status-group">
+        ${isHost ? '<span class="player-host-badge">HOST</span>' : ''}
+        <span class="player-ready-badge">READY</span>
+      </div>`;
     playersDiv.appendChild(row);
   });
 
