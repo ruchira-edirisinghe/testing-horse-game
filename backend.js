@@ -253,13 +253,16 @@ function startFirebaseRoom(code) {
     const room = snapshot.val();
     if (!room) return;
     
-    // Clear bet confirmation and horse selections for everyone for the new race
-    const updatedList = (room.playerList || []).map(p => ({
-      ...p,
-      betConfirmed: false,
-      horseIndex: -1,
-      amount: 0
-    }));
+    // Filter out players who are no longer present to avoid "ghost" players blocking the next race
+    const presence = room.presence || {};
+    const updatedList = (room.playerList || [])
+      .filter(p => presence[p.id] || p.isBot || p.id === room.hostId) // Keep present players, bots, and the host
+      .map(p => ({
+        ...p,
+        betConfirmed: false,
+        horseIndex: -1,
+        amount: 0
+      }));
 
     return roomRef.update({
       started: true,
@@ -327,6 +330,7 @@ function leaveFirebaseRoom(code, playerId) {
 
     if (room.hostId === playerId) {
       // Host is leaving - cancel the room for everyone
+      db.ref(`rooms/${code.toUpperCase()}/presence/${playerId}`).remove();
       return roomRef.update({
         cancelled: true,
         cancelledReason: "Host left the session",
@@ -334,6 +338,7 @@ function leaveFirebaseRoom(code, playerId) {
       });
     } else {
       // Regular player leaving - just remove them
+      db.ref(`rooms/${code.toUpperCase()}/presence/${playerId}`).remove();
       const updatedList = (room.playerList || []).filter(p => p.id !== playerId);
       const updatedNames = (room.players || []).filter(n => n !== room.playerList.find(p => p.id === playerId)?.name);
       return roomRef.update({

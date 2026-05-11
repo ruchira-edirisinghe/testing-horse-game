@@ -1670,11 +1670,16 @@ function tickBettingTimer() {
       const everyoneConfirmed = presentPlayers.length >= 1 && presentPlayers.every(p => p.betConfirmed);
       allPlayersReady = everyoneConfirmed;
       
-      // If timer hits 0, only start if we have at least 2 players and they confirmed.
-      // This enforces the "only starts when both confirm" rule.
+      // If timer hits 0, allow starting even if not everyone confirmed.
+      // We only block the automatic start if the timer is still running.
       if (presentPlayers.length > 1 && !presentPlayers.every(p => p.betConfirmed)) {
-        canStartIfTimerZero = false;
-        if (remaining <= 0 && timerLbl) {
+        if (remaining > 0) {
+          canStartIfTimerZero = false;
+        } else {
+          canStartIfTimerZero = true; // Timer expired, force start!
+        }
+
+        if (remaining <= 0 && !canStartIfTimerZero && timerLbl) {
           timerLbl.textContent = "WAITING FOR OTHERS...";
           timerVal.textContent = "—";
         }
